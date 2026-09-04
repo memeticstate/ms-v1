@@ -237,14 +237,19 @@ export async function getPonsProtocolHistory(limit = 30): Promise<PonsProtocolHi
     db.prepare(`SELECT generation, COUNT(*) AS launches,
         (SELECT COUNT(*) FROM pons_v1_swaps s WHERE s.generation = l.generation) AS swaps
       FROM pons_v1_launches l GROUP BY generation`).all<{ generation: PonsV1GenerationId; launches: number; swaps: number }>(),
-    db.prepare(`SELECT l.generation, l.token_address, l.deployer_address, l.pair_token_address,
+    db.prepare(`WITH recent_launches AS MATERIALIZED (
+        SELECT generation, token_address, deployer_address, pair_token_address, pair_symbol,
+          pool_address, token_name, token_symbol, block_number, block_timestamp, tx_hash
+        FROM pons_v1_launches ORDER BY block_number DESC LIMIT ?
+      )
+      SELECT l.generation, l.token_address, l.deployer_address, l.pair_token_address,
         l.pair_symbol, l.pool_address, l.token_name, l.token_symbol, l.block_number,
         l.block_timestamp, l.tx_hash, COUNT(s.id) AS swaps,
         COUNT(DISTINCT s.sender_address) AS unique_traders,
         SUM(CASE WHEN s.side = 'buy' THEN 1 ELSE 0 END) AS buys,
         SUM(CASE WHEN s.side = 'sell' THEN 1 ELSE 0 END) AS sells
-      FROM pons_v1_launches l LEFT JOIN pons_v1_swaps s ON s.token_address = l.token_address
-      GROUP BY l.token_address ORDER BY l.block_number DESC LIMIT ?`).bind(limit).all<{
+      FROM recent_launches l LEFT JOIN pons_v1_swaps s ON s.token_address = l.token_address
+      GROUP BY l.token_address ORDER BY l.block_number DESC`).bind(limit).all<{
         generation: PonsV1GenerationId; token_address: string; deployer_address: string;
         pair_token_address: string; pair_symbol: string; pool_address: string;
         token_name: string | null; token_symbol: string | null; block_number: number;

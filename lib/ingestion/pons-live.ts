@@ -32,7 +32,7 @@ import { ponsCollectionBudget } from "@/lib/pons/budget";
 const LOG_CHUNK_BLOCKS = 2_000;
 const REORG_REWIND_BLOCKS = 256;
 const LIVE_RPC_CONCURRENCY = 2;
-const METADATA_BUDGET_MS = 4_500;
+const METADATA_BUDGET_MS = 2_000;
 
 function ranges(fromBlock: number, toBlock: number, size = LOG_CHUNK_BLOCKS) {
   const result: Array<{ fromBlock: number; toBlock: number }> = [];
@@ -239,11 +239,16 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       warningCount: (safeHead - latestProcessed > LOG_CHUNK_BLOCKS ? 1 : 0) + (metadataErrorCode ? 1 : 0),
       metadata: runMetadata,
     });
+    const materializationStartedAt = Date.now();
     const materializedState = await getPonsState();
     await Promise.all([
       recordPonsActivitySnapshot(head.number, materializedState),
       cachePonsState(materializedState),
     ]);
+    console.info("PONS state materialized", {
+      indexedBlock: materializedState.index.latestIndexedBlock,
+      durationMs: Date.now() - materializationStartedAt,
+    });
     await resolveEngineAlert("pons_collection_failed", "collector", "pons-v2").catch(() => undefined);
     await prunePonsObservations().catch(() => undefined);
     return {

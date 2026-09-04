@@ -389,33 +389,46 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
       GROUP BY l.pair_symbol, l.pair_token_address`)
       .bind(fromBlock, latestIndexedBlock)
       .all<{ pair_symbol: string; pair_token_address: string; graduations: number }>(),
-    db.prepare(`SELECT l.token_address, l.curve_address, l.deployer_address, l.pair_token_address,
-        l.pair_symbol, l.token_name, l.token_symbol, l.block_number, l.block_timestamp, l.tx_hash,
-        l.launch_config_id, l.graduation_threshold_raw,
-        COUNT(t.id) AS trades, COUNT(DISTINCT t.actor_address) AS unique_traders,
-        SUM(CASE WHEN t.side = 'buy' THEN 1 ELSE 0 END) AS buys,
-        SUM(CASE WHEN t.side = 'sell' THEN 1 ELSE 0 END) AS sells,
-        SUM(CASE WHEN t.block_number >= ? THEN 1 ELSE 0 END) AS recent_trades,
-        SUM(CASE WHEN t.block_number BETWEEN ? AND ? THEN 1 ELSE 0 END) AS previous_trades,
-        COUNT(DISTINCT CASE WHEN t.block_number >= ? THEN t.actor_address END) AS recent_unique_traders,
-        SUM(CASE WHEN t.block_number >= ? AND t.side = 'buy' THEN 1 ELSE 0 END) AS recent_buys,
-        SUM(CASE WHEN t.block_number >= ? AND t.side = 'sell' THEN 1 ELSE 0 END) AS recent_sells,
-        CASE WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = l.token_address AND e.event_type = 'graduation' AND e.block_number <= ?) THEN 'graduated'
-             WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = l.token_address AND e.event_type = 'sweep' AND e.block_number <= ?) THEN 'swept'
+    db.prepare(`WITH trade_metrics AS MATERIALIZED (
+        SELECT token_address, COUNT(*) AS trades,
+          COUNT(DISTINCT actor_address) AS unique_traders,
+          SUM(CASE WHEN side = 'buy' THEN 1 ELSE 0 END) AS buys,
+          SUM(CASE WHEN side = 'sell' THEN 1 ELSE 0 END) AS sells,
+          SUM(CASE WHEN block_number >= ? THEN 1 ELSE 0 END) AS recent_trades,
+          SUM(CASE WHEN block_number BETWEEN ? AND ? THEN 1 ELSE 0 END) AS previous_trades,
+          COUNT(DISTINCT CASE WHEN block_number >= ? THEN actor_address END) AS recent_unique_traders,
+          SUM(CASE WHEN block_number >= ? AND side = 'buy' THEN 1 ELSE 0 END) AS recent_buys,
+          SUM(CASE WHEN block_number >= ? AND side = 'sell' THEN 1 ELSE 0 END) AS recent_sells
+        FROM pons_curve_trades WHERE block_number BETWEEN ? AND ? GROUP BY token_address
+      ), ranked AS MATERIALIZED (
+        SELECT l.token_address, l.curve_address, l.deployer_address, l.pair_token_address,
+          l.pair_symbol, l.token_name, l.token_symbol, l.block_number, l.block_timestamp, l.tx_hash,
+          l.launch_config_id, l.graduation_threshold_raw,
+          COALESCE(t.trades, 0) AS trades, COALESCE(t.unique_traders, 0) AS unique_traders,
+          COALESCE(t.buys, 0) AS buys, COALESCE(t.sells, 0) AS sells,
+          COALESCE(t.recent_trades, 0) AS recent_trades,
+          COALESCE(t.previous_trades, 0) AS previous_trades,
+          COALESCE(t.recent_unique_traders, 0) AS recent_unique_traders,
+          COALESCE(t.recent_buys, 0) AS recent_buys,
+          COALESCE(t.recent_sells, 0) AS recent_sells
+        FROM pons_launches l LEFT JOIN trade_metrics t ON t.token_address = l.token_address
+        WHERE l.block_number BETWEEN ? AND ? OR t.token_address IS NOT NULL
+        ORDER BY recent_trades DESC, trades DESC, unique_traders DESC, l.block_number DESC LIMIT 120
+      )
+      SELECT r.*,
+        CASE WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = r.token_address AND e.event_type = 'graduation' AND e.block_number <= ?) THEN 'graduated'
+             WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = r.token_address AND e.event_type = 'sweep' AND e.block_number <= ?) THEN 'swept'
              ELSE 'bonding' END AS phase,
-        (SELECT COUNT(*) FROM pons_launches d WHERE d.deployer_address = l.deployer_address AND d.block_number <= ?) AS deployer_launches,
+        (SELECT COUNT(*) FROM pons_launches d WHERE d.deployer_address = r.deployer_address AND d.block_number <= ?) AS deployer_launches,
         (SELECT COUNT(DISTINCT e2.token_address) FROM pons_events e2
           JOIN pons_launches d2 ON d2.token_address = e2.token_address
-          WHERE d2.deployer_address = l.deployer_address AND e2.event_type = 'graduation' AND e2.block_number <= ?) AS deployer_graduations
-      FROM pons_launches l LEFT JOIN pons_curve_trades t
-        ON t.token_address = l.token_address AND t.block_number BETWEEN ? AND ?
-      WHERE l.block_number BETWEEN ? AND ? OR t.id IS NOT NULL
-      GROUP BY l.token_address
-      ORDER BY recent_trades DESC, trades DESC, unique_traders DESC, l.block_number DESC LIMIT 120`)
+          WHERE d2.deployer_address = r.deployer_address AND e2.event_type = 'graduation' AND e2.block_number <= ?) AS deployer_graduations
+      FROM ranked r
+      ORDER BY recent_trades DESC, trades DESC, unique_traders DESC, block_number DESC`)
       .bind(
         recentFromBlock, previousFromBlock, previousToBlock, recentFromBlock, recentFromBlock,
-        recentFromBlock, latestIndexedBlock, latestIndexedBlock, latestIndexedBlock, latestIndexedBlock,
-        fromBlock, latestIndexedBlock, fromBlock, latestIndexedBlock,
+        recentFromBlock, fromBlock, latestIndexedBlock, fromBlock, latestIndexedBlock,
+        latestIndexedBlock, latestIndexedBlock, latestIndexedBlock, latestIndexedBlock,
       ).all<{
         token_address: string; curve_address: string; deployer_address: string; pair_token_address: string;
         pair_symbol: string; token_name: string | null; token_symbol: string | null; block_number: number;
