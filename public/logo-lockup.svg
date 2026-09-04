@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 240" fill="none">
+  <rect width="980" height="240" rx="28" fill="#171A14"/>
+  <g opacity=".11" stroke="#A4B579"><path d="M0 198C183 93 322 175 471 71C635-43 770 99 980 31"/><path d="M0 227C191 151 326 213 491 115C646 23 797 132 980 79"/></g>
+  <g transform="translate(25 -15) scale(.72)"><g stroke="#D0A760" stroke-width="10"><path d="M72 126V72H126"/><path d="M194 72H248V126"/><path d="M248 194V248H194"/><path d="M126 248H72V194"/></g><path d="M96 112C121 91 146 96 146 126C146 157 113 161 113 188C113 214 139 230 164 214L225 158C240 144 257 148 278 158" stroke="#A4B579" stroke-width="10" stroke-linecap="round"/><path d="M146 126C166 126 185 112 200 121C213 129 218 143 225 158" stroke="#E8E2D3" stroke-width="6" stroke-linecap="round"/><circle cx="146" cy="126" r="8" fill="#C36A4B"/><circle cx="113" cy="188" r="8" fill="#C36A4B"/></g>
+  <text x="270" y="112" fill="#E8E2D3" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" letter-spacing="8">MEMETIC</text>
+  <text x="270" y="174" fill="#C36A4B" font-family="Georgia, serif" font-size="62" font-style="italic">State</text>
+  <text x="515" y="170" fill="#D0A760" opacity=".7" font-family="monospace" font-size="15" letter-spacing="3">ATTENTION INTELLIGENCE</text>
+</svg>

@@ -1,0 +1,518 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+
+:root {
+  /* Memetic State / Field Archive — night atlas */
+  --night-ink: #171a14;
+  --field-paper: #e8e2d3;
+  --oxidized-clay: #c36a4b;
+  --lichen-green: #a4b579;
+  --aged-brass: #d0a760;
+  --river-slate: #899890;
+  --signal: var(--lichen-green);
+  --culture: var(--oxidized-clay);
+  --attention: var(--aged-brass);
+  --slate: var(--river-slate);
+  --danger: #dc7966;
+  --background: var(--night-ink);
+  --foreground: var(--field-paper);
+  --surface-depth: #10130f;
+  --surface-1: #1a1e18;
+  --surface-2: #1e231c;
+  --surface-3: #252a22;
+  --surface-popover: #2a3027;
+  --card: var(--surface-2);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--foreground);
+  --primary: var(--signal);
+  --primary-foreground: #171a14;
+  --secondary: #30372b;
+  --secondary-foreground: var(--foreground);
+  --muted: #292f26;
+  --muted-foreground: #a8aa9d;
+  --accent: #363e30;
+  --accent-foreground: var(--foreground);
+  --destructive: var(--danger);
+  --border: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --input: color-mix(in srgb, var(--foreground) 16%, transparent);
+  --ring: var(--signal);
+  --chart-1: var(--signal);
+  --chart-2: var(--culture);
+  --chart-3: var(--attention);
+  --chart-4: var(--slate);
+  --chart-5: var(--field-paper);
+  --radius: 0.45rem;
+}
+
+.light {
+  /* sun-bleached field notebook */
+  --night-ink: #25281f;
+  --field-paper: #eee7d8;
+  --oxidized-clay: #9f4933;
+  --lichen-green: #5d703f;
+  --aged-brass: #876329;
+  --river-slate: #52645e;
+  --signal: var(--lichen-green);
+  --culture: var(--oxidized-clay);
+  --attention: var(--aged-brass);
+  --slate: var(--river-slate);
+  --danger: #a84838;
+  --background: #e8e1d2;
+  --foreground: #25281f;
+  --surface-depth: #d7cfbd;
+  --surface-1: #efe8d9;
+  --surface-2: #f5efe3;
+  --surface-3: #ded6c5;
+  --surface-popover: #fbf6ec;
+  --card: var(--surface-2);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--foreground);
+  --primary: var(--signal);
+  --primary-foreground: #fbf6ec;
+  --secondary: #ddd4c2;
+  --secondary-foreground: var(--foreground);
+  --muted: #ded6c5;
+  --muted-foreground: #6f7167;
+  --accent: #d2c8b4;
+  --accent-foreground: var(--foreground);
+  --destructive: var(--danger);
+  --border: color-mix(in srgb, var(--foreground) 15%, transparent);
+  --input: color-mix(in srgb, var(--foreground) 20%, transparent);
+  --ring: var(--signal);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-signal: var(--signal);
+  --color-culture: var(--culture);
+  --color-attention: var(--attention);
+  --color-slate: var(--slate);
+  --color-danger: var(--danger);
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Aptos", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--background); }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 22% -12%, color-mix(in srgb, var(--signal) 10%, transparent) 0, transparent 31rem),
+    radial-gradient(circle at 92% 20%, color-mix(in srgb, var(--culture) 9%, transparent) 0, transparent 25rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+::selection { background: color-mix(in srgb, var(--signal) 35%, transparent); color: var(--foreground); }
+.specimen-serif { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+.scrollbar-gutter-stable { scrollbar-gutter: stable; }
+
+.state-glyph-shell {
+  --glyph-cutout: var(--background);
+  --glyph-frame: var(--attention);
+  --glyph-route: var(--signal);
+  --glyph-branch: var(--foreground);
+  --glyph-node: var(--culture);
+  position: relative;
+}
+.state-glyph-shell::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid color-mix(in srgb, var(--attention) 32%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.observation-rail { animation: atlas-reveal 560ms cubic-bezier(.2,.8,.2,1) both; }
+.observation-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .75rem;
+  padding: .78rem 1rem;
+  border-right: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.observation-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 27%, transparent);
+}
+.observation-value {
+  margin-top: .35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.1;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 72%, transparent);
+}
+.observatory-header {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--background) 97%, transparent) 0%, color-mix(in srgb, var(--background) 91%, transparent) 78%, transparent 100%);
+}
+.observatory-toolbar { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent); }
+.block-seismograph {
+  position: relative;
+  isolation: isolate;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 3%, transparent), 0 18px 55px color-mix(in srgb, #000000 32%, transparent);
+}
+.block-seismograph::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--signal) 6%, transparent), transparent 30rem),
+    radial-gradient(circle at 88% 100%, color-mix(in srgb, var(--attention) 5%, transparent), transparent 26rem);
+}
+.seismograph-screen {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--signal) 4%, transparent), transparent 60%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+.seismograph-screen::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: -35% 0 auto;
+  height: 40%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--signal) 4%, transparent) 55%, color-mix(in srgb, var(--signal) 10%, transparent) 58%, transparent 62%);
+  animation: seismograph-scan 7s linear infinite;
+}
+@keyframes seismograph-scan {
+  to { transform: translateY(440%); }
+}
+.signal-briefing {
+  position: relative;
+  isolation: isolate;
+}
+.signal-briefing::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 49.9%, color-mix(in srgb, var(--foreground) 3%, transparent) 50%, transparent 50.1%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--signal) 6%, transparent), transparent 28rem),
+    radial-gradient(circle at 90% 100%, color-mix(in srgb, var(--attention) 5%, transparent), transparent 24rem);
+}
+
+.network-manifesto {
+  isolation: isolate;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4.5%, transparent), 0 22px 70px color-mix(in srgb, #000000 36%, transparent);
+}
+.network-manifesto::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 49.9%, color-mix(in srgb, var(--foreground) 5%, transparent) 50%, transparent 50.1%),
+    linear-gradient(color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px),
+    radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--signal) 8%, transparent), transparent 30rem),
+    radial-gradient(circle at 92% 84%, color-mix(in srgb, var(--attention) 7%, transparent), transparent 28rem);
+  background-size: auto, 42px 42px, 42px 42px, auto, auto;
+}
+.network-manifesto::after {
+  content: "";
+  position: absolute;
+  inset: -55% auto auto 33%;
+  width: 1px;
+  height: 220%;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--attention) 30%, transparent) 45%, transparent 58%);
+  transform: rotate(24deg);
+  animation: network-sweep 8s linear infinite;
+  pointer-events: none;
+}
+.state-circuit { box-shadow: inset 0 0 45px var(--surface-depth), 0 15px 50px color-mix(in srgb, #000000 31%, transparent); }
+.passport-ledger {
+  position: relative;
+  isolation: isolate;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent), 0 18px 55px color-mix(in srgb, #000000 27%, transparent);
+}
+.passport-ledger::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 17px 16px, var(--background) 0 3px, color-mix(in srgb, var(--culture) 24%, transparent) 3.5px 4.5px, transparent 5px) 0 0 / 34px 32px repeat-y,
+    linear-gradient(90deg, transparent 33px, color-mix(in srgb, var(--culture) 17%, transparent) 34px, transparent 35px),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--culture) 5.5%, transparent), transparent 30rem);
+}
+.network-kicker {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 23%, transparent);
+}
+.network-kicker + strong {
+  display: block;
+  margin-top: .65rem;
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  line-height: 1;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+}
+.circuit-station {
+  position: relative;
+  min-height: 228px;
+}
+.circuit-station::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1px;
+  background: linear-gradient(transparent, var(--station-tone), transparent);
+  opacity: .5;
+}
+.circuit-station::after {
+  content: "";
+  position: absolute;
+  top: 45px;
+  left: 20px;
+  width: calc(100% - 40px);
+  height: 1px;
+  background: linear-gradient(90deg, var(--station-tone), transparent);
+  opacity: .14;
+}
+@keyframes network-sweep {
+  from { transform: translateX(-40vw) rotate(24deg); opacity: 0; }
+  14%, 78% { opacity: 1; }
+  to { transform: translateX(75vw) rotate(24deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-manifesto::after { animation: none; opacity: .35; }
+}
+.pulse-cell {
+  min-width: 0;
+  padding: 1rem;
+  border-right: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.engine-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 34%, transparent);
+}
+
+@keyframes atlas-reveal {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.field-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--foreground) 4.5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 4.5%, transparent) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.pons-field {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px),
+    radial-gradient(circle at 50% 52%, color-mix(in srgb, var(--surface-3) 82%, transparent) 0, transparent 38%);
+  background-size: 32px 32px, 32px 32px, auto;
+}
+
+.pons-field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 68%, color-mix(in srgb, var(--surface-depth) 86%, transparent) 100%);
+}
+
+.gravity-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: gravity-core 7s ease-in-out infinite;
+}
+
+.cohort-pill {
+  min-width: 126px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--foreground) 2%, transparent);
+  padding: .6rem .7rem;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+.cohort-pill:hover { border-color: color-mix(in srgb, var(--foreground) 16%, transparent); transform: translateY(-1px); }
+.cohort-pill > span {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 61%, transparent);
+}
+.cohort-pill small {
+  display: block;
+  margin-top: .3rem;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+.cohort-pill em {
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--signal) 24%, transparent);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 5px;
+  font-style: normal;
+  letter-spacing: .13em;
+  color: var(--signal);
+}
+.cohort-pill-active {
+  border-color: color-mix(in srgb, var(--cohort-color, var(--signal)) 40%, transparent);
+  background: color-mix(in srgb, var(--cohort-color, var(--signal)) 8%, transparent);
+}
+.cohort-pill-active > span { color: var(--cohort-color, var(--signal)); }
+
+.dossier-cell {
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  padding: .65rem;
+}
+.dossier-cell strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 72%, transparent);
+}
+.dossier-cell span {
+  display: block;
+  margin-top: .3rem;
+  font-family: var(--font-mono);
+  font-size: 6px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+.pons-empty::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: repeating-radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--signal) 6%, transparent) 0 1px, transparent 1px 38px);
+  animation: empty-orbit 28s linear infinite;
+}
+
+@keyframes gravity-core {
+  0%, 100% { opacity: .9; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.025); }
+}
+@keyframes empty-orbit { to { transform: rotate(360deg); } }
+
+.edge-flow { animation: edge-flow 7s linear infinite; }
+.node-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: node-breathe 4.6s ease-in-out infinite;
+}
+.signal-pulse { animation: signal-pulse 3.2s ease-out infinite; }
+
+@keyframes edge-flow { to { stroke-dashoffset: -40; } }
+@keyframes node-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes signal-pulse {
+  0% { opacity: 0.8; transform: scale(0.76); }
+  80%, 100% { opacity: 0; transform: scale(1.32); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .observation-cell:nth-child(4) { border-right: 0; }
+  .observation-cell { border-bottom: 0; }
+  .pulse-cell { border-bottom: 0; }
+  .pulse-cell:last-child { border-right: 0; }
+}
+
+@media (max-width: 1023px) {
+  .observation-cell:nth-child(2n) { border-right: 0; }
+  .observation-cell:nth-child(n+3) { border-bottom: 0; }
+  .pulse-cell:nth-child(2n) { border-right: 0; }
+  .pulse-cell:nth-child(n+3) { border-bottom: 0; }
+}
+
+@media (max-width: 767px) {
+  .pulse-cell { border-right: 0; }
+  .pulse-cell:not(:last-child) { border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent); }
+}
