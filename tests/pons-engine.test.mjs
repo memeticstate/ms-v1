@@ -140,9 +140,9 @@ test("keeps PONS collection inside the worker runtime while prioritizing the liv
   const catchup = ponsCollectionBudget(150_000);
   const severeCatchup = ponsCollectionBudget(250_000);
   const balanced = ponsCollectionBudget(10_000);
-  assert.deepEqual(catchup, { strategy: "live-catchup", liveBlocks: 2_500, backfillBlocks: 0, metadataLimit: 5 });
-  assert.deepEqual(severeCatchup, { strategy: "live-catchup", liveBlocks: 3_000, backfillBlocks: 0, metadataLimit: 3 });
-  assert.deepEqual(balanced, { strategy: "balanced", liveBlocks: 1_500, backfillBlocks: 1_500, metadataLimit: 8 });
+  assert.deepEqual(catchup, { strategy: "live-catchup", liveBlocks: 1_500, backfillBlocks: 0, metadataLimit: 2 });
+  assert.deepEqual(severeCatchup, { strategy: "live-catchup", liveBlocks: 2_000, backfillBlocks: 0, metadataLimit: 0 });
+  assert.deepEqual(balanced, { strategy: "balanced", liveBlocks: 1_000, backfillBlocks: 1_000, metadataLimit: 5 });
   assert.ok(catchup.liveBlocks + catchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
   assert.ok(severeCatchup.liveBlocks + severeCatchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
   assert.equal(balanced.liveBlocks + balanced.backfillBlocks, PONS_MAX_BLOCKS_PER_RUN);
@@ -177,6 +177,8 @@ test("materializes one durable state artifact and exposes multi-horizon memory",
   assert.match(ledger, /loadCachedPonsState/);
   assert.match(indexer, /recordPonsActivitySnapshot\(head\.number, materializedState\)/);
   assert.match(indexer, /cachePonsState\(materializedState\)/);
+  assert.match(indexer, /MATERIALIZATION_START_DEADLINE_MS/);
+  assert.match(indexer, /PONS state materialization deferred/);
   assert.match(ledger, /WITH trade_metrics AS MATERIALIZED/);
   assert.match(historyLedger, /WITH recent_launches AS MATERIALIZED/);
   assert.ok(indexer.indexOf("completeCollectionRun(run.id") < indexer.indexOf("const materializedState = await getPonsState()"));

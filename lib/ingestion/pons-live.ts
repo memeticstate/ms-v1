@@ -32,7 +32,9 @@ import { ponsCollectionBudget } from "@/lib/pons/budget";
 const LOG_CHUNK_BLOCKS = 2_000;
 const REORG_REWIND_BLOCKS = 256;
 const LIVE_RPC_CONCURRENCY = 2;
-const METADATA_BUDGET_MS = 2_000;
+const METADATA_BUDGET_MS = 1_500;
+const MATERIALIZATION_START_DEADLINE_MS = 21_000;
+const MAINTENANCE_START_DEADLINE_MS = 27_000;
 
 function ranges(fromBlock: number, toBlock: number, size = LOG_CHUNK_BLOCKS) {
   const result: Array<{ fromBlock: number; toBlock: number }> = [];
@@ -181,9 +183,11 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       await updateRunPhase(run.id, phase, {
         pendingLimit: budget.metadataLimit, priority: "observed-trades", budgetMs: METADATA_BUDGET_MS,
       });
-      pending = await pendingPonsMetadata(budget.metadataLimit);
-      metadata = await withinMilliseconds(readPonsTokenMetadata(pending), METADATA_BUDGET_MS);
-      await updatePonsMetadata(metadata.records);
+      if (budget.metadataLimit > 0) {
+        pending = await pendingPonsMetadata(budget.metadataLimit);
+        metadata = await withinMilliseconds(readPonsTokenMetadata(pending), METADATA_BUDGET_MS);
+        await updatePonsMetadata(metadata.records);
+      }
     } catch (error) {
       metadataErrorCode = collectionErrorCode(error);
     }
@@ -239,18 +243,34 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       warningCount: (safeHead - latestProcessed > LOG_CHUNK_BLOCKS ? 1 : 0) + (metadataErrorCode ? 1 : 0),
       metadata: runMetadata,
     });
-    const materializationStartedAt = Date.now();
-    const materializedState = await getPonsState();
-    await Promise.all([
-      recordPonsActivitySnapshot(head.number, materializedState),
-      cachePonsState(materializedState),
-    ]);
-    console.info("PONS state materialized", {
-      indexedBlock: materializedState.index.latestIndexedBlock,
-      durationMs: Date.now() - materializationStartedAt,
-    });
     await resolveEngineAlert("pons_collection_failed", "collector", "pons-v2").catch(() => undefined);
-    await prunePonsObservations().catch(() => undefined);
+    const elapsedBeforeMaterialization = Date.now() - startedAt;
+    if (elapsedBeforeMaterialization <= MATERIALIZATION_START_DEADLINE_MS) {
+      const materializationStartedAt = Date.now();
+      try {
+        const materializedState = await getPonsState();
+        await Promise.all([
+          recordPonsActivitySnapshot(head.number, materializedState),
+          cachePonsState(materializedState),
+        ]);
+        console.info("PONS state materialized", {
+          indexedBlock: materializedState.index.latestIndexedBlock,
+          durationMs: Date.now() - materializationStartedAt,
+        });
+      } catch (error) {
+        console.error("PONS state materialization failed", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else {
+      console.info("PONS state materialization deferred", {
+        latestProcessed,
+        elapsedMs: elapsedBeforeMaterialization,
+      });
+    }
+    if (Date.now() - startedAt <= MAINTENANCE_START_DEADLINE_MS) {
+      await prunePonsObservations().catch(() => undefined);
+    }
     return {
       status: "recorded" as const,
       headBlock: head.number,
