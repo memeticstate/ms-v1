@@ -2,19 +2,19 @@ import type { SVGProps } from "react";
 
 export function StateGlyph({ className, ...props }: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 320 320" fill="none" className={className} aria-hidden="true" {...props}>
-      <g stroke="var(--glyph-frame, currentColor)" strokeWidth="8" strokeLinecap="square" strokeLinejoin="round">
-        <path d="M72 126V72H126" />
-        <path d="M194 72H248V126" />
-        <path d="M248 194V248H194" />
-        <path d="M126 248H72V194" />
+    <svg viewBox="0 0 100 100" fill="none" className={className} aria-hidden="true" {...props}>
+      <g stroke="var(--glyph-frame, #c9a227)" strokeWidth="4.5" strokeLinecap="square">
+        <path d="M31 12H8V35" />
+        <path d="M70 12H92V35" />
+        <path d="M92 72V94H70" />
+        <path d="M8 72V94H31" />
       </g>
-      <path d="M96 112C121 91 146 96 146 126C146 157 113 161 113 188C113 214 139 230 164 214L225 158C240 144 257 148 278 158" stroke="var(--glyph-route, currentColor)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M146 126C166 126 185 112 200 121C213 129 218 143 225 158" stroke="var(--glyph-branch, var(--glyph-route, currentColor))" strokeWidth="5" strokeLinecap="round" />
-      <circle cx="96" cy="112" r="11" fill="var(--glyph-cutout, var(--background))" stroke="var(--glyph-route, currentColor)" strokeWidth="7" />
-      <circle cx="146" cy="126" r="7" fill="var(--glyph-node, currentColor)" />
-      <circle cx="113" cy="188" r="7" fill="var(--glyph-node, currentColor)" />
-      <rect x="270" y="150" width="16" height="16" rx="2" transform="rotate(45 278 158)" fill="var(--glyph-route, currentColor)" />
+      <path d="M50 15V97M7 53H87" stroke="var(--glyph-route, #8fa876)" strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M29 32L71 74M71 32L29 74" stroke="var(--glyph-frame, #c9a227)" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M57 11C77 15 90 30 92 47" stroke="var(--glyph-node, #c36a4b)" strokeWidth="2.5" strokeDasharray="3.4 2.6" />
+      <circle cx="50" cy="9" r="5.1" fill="var(--glyph-node, #c36a4b)" />
+      <circle cx="93" cy="53" r="5.1" fill="var(--glyph-node, #c36a4b)" />
+      <circle cx="50" cy="53" r="5.2" fill="var(--glyph-branch, #ede6d5)" />
     </svg>
   );
 }
