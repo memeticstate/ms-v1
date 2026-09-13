@@ -5,6 +5,10 @@
   "compatibility_date": "2026-09-13",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "vars": {
+    "MEMETIC_AUTH_MODE": "privy",
+    "PRIVY_APP_ID": "cmtp72a3700070bl79bfbeliw"
+  },
   "d1_databases": [
     {
       "binding": "DB",
