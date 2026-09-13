@@ -189,15 +189,15 @@ test("indexes PONS from canonical logs with finality, reorg rewind, and independ
 });
 
 test("keeps PONS collection inside the worker runtime while prioritizing the live edge", () => {
-  const catchup = ponsCollectionBudget(150_000);
+  const catchup = ponsCollectionBudget(10_000);
   const severeCatchup = ponsCollectionBudget(250_000);
-  const balanced = ponsCollectionBudget(10_000);
-  assert.deepEqual(catchup, { strategy: "live-catchup", liveBlocks: 1_500, backfillBlocks: 0, metadataLimit: 2 });
+  const nearHead = ponsCollectionBudget(2_000);
+  assert.deepEqual(catchup, { strategy: "live-catchup", liveBlocks: 2_000, backfillBlocks: 0, metadataLimit: 2 });
   assert.deepEqual(severeCatchup, { strategy: "live-catchup", liveBlocks: 2_000, backfillBlocks: 0, metadataLimit: 2 });
-  assert.deepEqual(balanced, { strategy: "balanced", liveBlocks: 1_000, backfillBlocks: 1_000, metadataLimit: 5 });
-  assert.ok(catchup.liveBlocks + catchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
-  assert.ok(severeCatchup.liveBlocks + severeCatchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
-  assert.equal(balanced.liveBlocks + balanced.backfillBlocks, PONS_MAX_BLOCKS_PER_RUN);
+  assert.deepEqual(nearHead, { strategy: "balanced", liveBlocks: 1_600, backfillBlocks: 400, metadataLimit: 5 });
+  assert.equal(catchup.liveBlocks + catchup.backfillBlocks, PONS_MAX_BLOCKS_PER_RUN);
+  assert.equal(severeCatchup.liveBlocks + severeCatchup.backfillBlocks, PONS_MAX_BLOCKS_PER_RUN);
+  assert.equal(nearHead.liveBlocks + nearHead.backfillBlocks, PONS_MAX_BLOCKS_PER_RUN);
 });
 
 test("retries provider pressure while failing closed on semantic RPC errors", async () => {
