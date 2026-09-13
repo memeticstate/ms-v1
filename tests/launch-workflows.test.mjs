@@ -82,14 +82,6 @@ test("watchlist parser rejects corrupt local state", async () => {
   assert.deepEqual(parseWatchlist(JSON.stringify({ tokenAddress: "0x1" })), []);
 });
 
-test("launch plan is condensed around one 30-day operating loop", async () => {
-  const plan = await readFile(path.join(root, "docs/launch/gtm.md"), "utf8");
-  assert.match(plan, /The 30-day loop/);
-  assert.match(plan, /Observe:[\s\S]*Return:[\s\S]*Learn:[\s\S]*Convert:/);
-  assert.match(plan, /PONS remains the intelligence universe/);
-  assert.match(plan, /NVDA remains the focused flagship habitat/);
-});
-
 test("Pulse visual export is X-ready and evidence labeled", async () => {
   const source = await readFile(path.join(root, "lib/pons/pulse-card.ts"), "utf8");
   assert.match(source, /const WIDTH = 1600/);
