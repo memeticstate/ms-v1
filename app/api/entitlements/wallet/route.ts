@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { verifyMessage } from "viem";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { authErrorResponse, authProviderFromBindings } from "@/lib/auth/config";
+import { authenticateMember } from "@/lib/auth/server";
 import { rejectCrossSiteMutation } from "@/lib/entitlements/request-security";
 import { ROBINHOOD_CHAIN_ID } from "@/lib/entitlements/wallet-message";
 import { evaluatePremiumAccess } from "@/lib/entitlements/token-gate";
@@ -22,7 +23,23 @@ export async function POST(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > 20_000) {
     return Response.json({ accepted: false, error: "request_too_large" }, { status: 413, headers: { "cache-control": "no-store" } });
   }
-  const user = await getChatGPTUser();
+  const bindings = env as unknown as Record<string, unknown>;
+  try {
+    if (authProviderFromBindings(bindings) === "privy") {
+      return Response.json({ accepted: false, error: "wallet_link_managed_by_privy" }, {
+        status: 410,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticateMember({ request, db: env.DB, bindings });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ accepted: false, error: "sign_in_required" }, { status: 401, headers: { "cache-control": "no-store" } });
 
   let challengeId = "";
@@ -74,8 +91,8 @@ export async function POST(request: Request) {
 
   const linked = await env.DB.prepare(`
     INSERT INTO linked_wallets
-      (wallet_address, user_id, chain_id, is_primary, verified_at, updated_at)
-    VALUES (?, ?, ?, 1, ?, ?)
+      (wallet_address, user_id, chain_id, is_primary, verified_at, updated_at, source)
+    VALUES (?, ?, ?, 1, ?, ?, 'signature')
     ON CONFLICT(wallet_address) DO UPDATE SET
       chain_id = excluded.chain_id,
       is_primary = 1,
@@ -96,7 +113,7 @@ export async function POST(request: Request) {
     gate = await evaluatePremiumAccess({
       db: env.DB,
       userId: user.id,
-      bindings: env as unknown as Record<string, unknown>,
+      bindings,
       force: true,
     });
   } catch {

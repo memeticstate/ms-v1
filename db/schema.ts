@@ -1,6 +1,32 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const ponsRecentCurveChecks = sqliteTable("pons_recent_curve_checks", {
+  tokenAddress: text("token_address").primaryKey(),
+  lockedUntil: integer("locked_until").notNull().default(0),
+  retryAfter: integer("retry_after").notNull().default(0),
+  payloadJson: text("payload_json"),
+  lastError: text("last_error"),
+});
+
+export const premiumCases = sqliteTable("premium_cases", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenAddress: text("token_address").notNull(),
+  title: text("title").notNull(),
+  thesis: text("thesis").notNull(),
+  invalidationNote: text("invalidation_note").notNull(),
+  outcomeNote: text("outcome_note").notNull().default(""),
+  status: text("status").notNull().default("open"),
+  queryJson: text("query_json").notNull(),
+  originalEvidenceJson: text("original_evidence_json").notNull(),
+  latestReviewJson: text("latest_review_json"),
+  version: integer("version").notNull().default(1),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  reviewedAt: integer("reviewed_at"),
+}, (table) => [index("premium_cases_user_updated_idx").on(table.userId, table.updatedAt)]);
+
 export const affinitySnapshots = sqliteTable("affinity_snapshots", {
   id: text("id").primaryKey(),
   observedAt: integer("observed_at").notNull(),
@@ -274,6 +300,13 @@ export const ponsIndexState = sqliteTable("pons_index_state", {
   lastRecordCount: integer("last_record_count").notNull().default(0),
 });
 
+export const tokenDiscoveryCache = sqliteTable("token_discovery_cache", {
+  key: text("key").primaryKey(),
+  payloadJson: text("payload_json").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [index("token_discovery_cache_expiry_idx").on(table.expiresAt)]);
+
 export const ponsLaunches = sqliteTable("pons_launches", {
   tokenAddress: text("token_address").primaryKey(),
   curveAddress: text("curve_address").notNull(),
@@ -297,6 +330,7 @@ export const ponsLaunches = sqliteTable("pons_launches", {
   uniqueIndex("pons_launches_curve_unique").on(table.curveAddress),
   uniqueIndex("pons_launches_tx_log_unique").on(table.txHash, table.logIndex),
   index("pons_launches_pair_block_idx").on(table.pairSymbol, table.blockNumber),
+  index("pons_launches_quote_address_block_idx").on(table.pairTokenAddress, table.blockNumber),
   index("pons_launches_deployer_block_idx").on(table.deployerAddress, table.blockNumber),
   index("pons_launches_block_idx").on(table.blockNumber),
   index("pons_launches_metadata_idx").on(table.metadataStatus, table.blockNumber),
@@ -419,6 +453,7 @@ export const ponsV1Launches = sqliteTable("pons_v1_launches", {
   uniqueIndex("pons_v1_launches_tx_log_unique").on(table.txHash, table.logIndex),
   index("pons_v1_launches_generation_block_idx").on(table.generation, table.blockNumber),
   index("pons_v1_launches_pair_block_idx").on(table.pairSymbol, table.blockNumber),
+  index("pons_v1_launches_quote_address_block_idx").on(table.pairTokenAddress, table.blockNumber),
   index("pons_v1_launches_deployer_block_idx").on(table.deployerAddress, table.blockNumber),
   index("pons_v1_launches_metadata_idx").on(table.metadataStatus, table.blockNumber),
 ]);
@@ -476,6 +511,20 @@ export const memberProfiles = sqliteTable("member_profiles", {
   index("member_profiles_email_idx").on(table.email),
 ]);
 
+export const memberIdentities = sqliteTable("member_identities", {
+  provider: text("provider").notNull(),
+  subject: text("subject").notNull(),
+  userId: text("user_id").notNull(),
+  lastAuthenticatedAt: integer("last_authenticated_at").notNull(),
+  lastSyncedAt: integer("last_synced_at").notNull(),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+}, (table) => [
+  primaryKey({ columns: [table.provider, table.subject] }),
+  index("member_identities_user_idx").on(table.userId),
+  index("member_identities_last_auth_idx").on(table.lastAuthenticatedAt),
+]);
+
 export const walletLinkChallenges = sqliteTable("wallet_link_challenges", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
@@ -496,6 +545,7 @@ export const linkedWallets = sqliteTable("linked_wallets", {
   isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(true),
   verifiedAt: integer("verified_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  source: text("source").notNull().default("signature"),
 }, (table) => [
   index("linked_wallets_user_primary_idx").on(table.userId, table.isPrimary),
 ]);
@@ -552,6 +602,34 @@ export const entitlementUsage = sqliteTable("entitlement_usage", {
   index("entitlement_usage_user_capability_period_idx").on(table.userId, table.capability, table.periodKey),
 ]);
 
+export const ponsTokenResearch = sqliteTable("pons_token_research", {
+  tokenAddress: text("token_address").primaryKey(),
+  checkedAt: integer("checked_at").notNull(),
+  refreshAfter: integer("refresh_after").notNull(),
+  payloadJson: text("payload_json").notNull(),
+}, (table) => [index("pons_research_refresh_idx").on(table.refreshAfter)]);
+
+export const premiumSupplyReferences = sqliteTable("premium_supply_references", {
+  chainId: integer("chain_id").notNull(),
+  contractAddress: text("contract_address").notNull(),
+  supplyRaw: text("supply_raw").notNull(),
+  decimals: integer("decimals").notNull(),
+  blockNumber: integer("block_number").notNull(),
+  recordedAt: integer("recorded_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.chainId, table.contractAddress] })]);
+
+export const ponsAuxJobs = sqliteTable("pons_aux_jobs", {
+  id: text("id").primaryKey(),
+  lockedUntil: integer("locked_until").notNull().default(0),
+  nextAt: integer("next_at").notNull().default(0),
+});
+
+// Independent near-head factory coverage; never advances the deep trade cursor.
+export const ponsFactoryFeed = sqliteTable("pons_factory_feed", {
+  id: text("id").primaryKey(),
+  payloadJson: text("payload_json").notNull(),
+});
+
 export const watchtowerWatches = sqliteTable("watchtower_watches", {
   userId: text("user_id").notNull(),
   tokenAddress: text("token_address").notNull(),
@@ -561,4 +639,40 @@ export const watchtowerWatches = sqliteTable("watchtower_watches", {
 }, (table) => [
   primaryKey({ columns: [table.userId, table.tokenAddress] }),
   index("watchtower_watches_user_time_idx").on(table.userId, table.updatedAt),
+]);
+
+// Private holder assignments. Times in these two tables are milliseconds.
+export const researchAssignments = sqliteTable("research_assignments", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenAddress: text("token_address").notNull(),
+  question: text("question").notNull(),
+  focus: text("focus").notNull(),
+  cadence: text("cadence").notNull(),
+  paused: integer("paused", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  nextRunAt: integer("next_run_at"),
+  lastRunAt: integer("last_run_at"),
+}, (table) => [
+  index("research_assignments_owner_idx").on(table.userId, table.updatedAt),
+  index("research_assignments_due_idx").on(table.paused, table.nextRunAt),
+]);
+
+export const researchRuns = sqliteTable("research_runs", {
+  id: text("id").primaryKey(),
+  assignmentId: text("assignment_id").notNull().references(() => researchAssignments.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  status: text("status").notNull(),
+  requestedAt: integer("requested_at").notNull(),
+  startedAt: integer("started_at"),
+  finishedAt: integer("finished_at"),
+  leaseUntil: integer("lease_until"),
+  leaseToken: text("lease_token"),
+  reportJson: text("report_json"),
+  errorCode: text("error_code"),
+}, (table) => [
+  index("research_runs_assignment_idx").on(table.assignmentId, table.requestedAt),
+  index("research_runs_queue_idx").on(table.status, table.requestedAt),
+  uniqueIndex("research_runs_one_active_idx").on(table.assignmentId).where(sql`${table.status} in ('queued', 'running')`),
 ]);

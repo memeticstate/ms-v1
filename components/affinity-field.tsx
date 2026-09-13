@@ -32,10 +32,10 @@ export function AffinityField({
     <section className="field-grid relative min-h-[540px] overflow-hidden rounded-[10px] border border-foreground/10 bg-[var(--surface-1)]/80 lg:min-h-[650px]">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between border-b border-foreground/10 bg-[var(--surface-1)]/75 px-4 py-3 backdrop-blur-md">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-signal">Affinity field</p>
-          <p className="mt-1 text-xs text-foreground/50">Verified composition + observed market state</p>
+          <p className="font-mono text-caption uppercase tracking-[0.24em] text-signal">Affinity field</p>
+          <p className="mt-1 text-xs text-muted-foreground">Verified composition + observed market state</p>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">
+        <div className="flex items-center gap-2 font-mono text-caption uppercase tracking-[0.16em] text-muted-foreground">
           <span className="relative flex size-2">
             {snapshotMode === "live" && <span className="absolute inline-flex size-full animate-ping rounded-full bg-signal opacity-40" />}
             <span className={`relative inline-flex size-2 rounded-full ${snapshotMode === "live" ? "bg-signal" : snapshotMode === "cached" ? "bg-culture" : "bg-foreground/35"}`} />
@@ -107,12 +107,12 @@ export function AffinityField({
                 stroke={habitat.color} strokeWidth={active || related ? 2 : 1}
                 opacity={activeHabitat && !active ? 0.35 : 1} />
               <text x={habitat.x} y={habitat.y + 4} textAnchor="middle" fill={habitat.color}
-                fontSize="10" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                fontSize="13" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
                 {habitat.symbol}
               </text>
               {!denseHabitatField ? (
                 <text x={habitat.x} y={habitat.y + 39} textAnchor="middle" fill="var(--slate)"
-                  fontSize="9" fontFamily="IBM Plex Mono, monospace">
+                  fontSize="13" fontFamily="IBM Plex Mono, monospace">
                   {habitat.sector.toUpperCase()}
                 </text>
               ) : null}
@@ -150,11 +150,11 @@ export function AffinityField({
               <circle cx={item.x - radius * 0.2} cy={item.y - radius * 0.2}
                 r={Math.max(5, radius * 0.24)} fill={item.color} opacity="0.82" />
               <text x={item.x} y={item.y + 4} textAnchor="middle" fill="var(--foreground)"
-                fontSize="11" fontFamily="IBM Plex Mono, monospace" fontWeight="800">
+                fontSize="13" fontFamily="IBM Plex Mono, monospace" fontWeight="800">
                 {item.symbol}
               </text>
               <text x={item.x} y={item.y + radius + 18} textAnchor="middle" fill={item.color}
-                fontSize="9" fontFamily="IBM Plex Mono, monospace">
+                fontSize="13" fontFamily="IBM Plex Mono, monospace">
                 VITALITY {item.vitality}
               </text>
             </g>
@@ -164,18 +164,18 @@ export function AffinityField({
 
       <div className="absolute inset-x-3 bottom-3 z-10 flex gap-1.5 overflow-x-auto rounded-md border border-foreground/10 bg-[var(--surface-2)]/85 p-2 backdrop-blur-md [scrollbar-width:none]">
         <button type="button" onClick={() => onHabitatChange(null)}
-          className={`shrink-0 rounded px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] transition ${
-            activeHabitat === null ? "bg-foreground text-background" : "bg-foreground/5 text-foreground/45 hover:text-foreground"
+          className={`shrink-0 rounded px-3 py-2 font-mono text-caption uppercase tracking-[0.12em] transition ${
+            activeHabitat === null ? "bg-foreground text-background" : "bg-foreground/5 text-muted-foreground hover:text-foreground"
           }`}>
           All habitats
         </button>
         {habitats.map((habitat) => (
           <button type="button" key={habitat.symbol}
             onClick={() => onHabitatChange(habitat.symbol === activeHabitat ? null : habitat.symbol)}
-            className={`shrink-0 rounded border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] transition ${
+            className={`shrink-0 rounded border px-3 py-2 font-mono text-caption uppercase tracking-[0.12em] transition ${
               activeHabitat === habitat.symbol
                 ? "border-transparent text-background"
-                : "border-foreground/10 bg-foreground/5 text-foreground/45 hover:border-foreground/20 hover:text-foreground"
+                : "border-foreground/10 bg-foreground/5 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
             }`}
             style={activeHabitat === habitat.symbol ? { backgroundColor: habitat.color } : undefined}>
             {habitat.symbol}

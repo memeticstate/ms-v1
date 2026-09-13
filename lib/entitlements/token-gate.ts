@@ -4,10 +4,12 @@ import {
   TOKEN_GATE_CHAIN_ID,
   TOKEN_GATE_ERROR_CACHE_SECONDS,
   readTokenGateOnchain,
+  qualifiesForPremium,
   tokenAdapterStatus,
   type TokenAdapterStatus,
   type TokenGateOnchainResult,
 } from "@/lib/entitlements/token-adapter";
+import { pinSupplyReference, readSupplyReference, type SupplyReference } from "./supply-reference";
 
 export type PremiumAccessStatus =
   | "active"
@@ -21,7 +23,7 @@ export type PremiumAccess = {
   active: boolean;
   status: PremiumAccessStatus;
   thresholdBps: typeof PREMIUM_HOLDER_THRESHOLD_BPS;
-  thresholdPercent: "0.05%";
+  thresholdPercent: "0.1%";
   chainId: typeof TOKEN_GATE_CHAIN_ID;
   walletAddress: string | null;
   checkedAt: string | null;
@@ -30,6 +32,11 @@ export type PremiumAccess = {
   confirmations: number;
   providerCount: number;
   reason: string;
+  supplyReferenceRaw: string | null;
+  requiredBalanceRaw: string | null;
+  balanceRaw: string | null;
+  tokenDecimals: number | null;
+  supplyReferenceBlock: number | null;
 };
 
 export type PremiumAccessEvaluation = {
@@ -50,6 +57,7 @@ type GateCheckRow = {
   provider_count: number;
   checked_at: number;
   expires_at: number;
+  balance_raw: string | null;
 };
 
 function iso(seconds: number | null) {
@@ -62,7 +70,7 @@ function baseAccess(status: PremiumAccessStatus, reason: string, walletAddress: 
     active: status === "active",
     status,
     thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-    thresholdPercent: "0.05%",
+    thresholdPercent: "0.1%",
     chainId: TOKEN_GATE_CHAIN_ID,
     walletAddress,
     checkedAt: null,
@@ -71,21 +79,37 @@ function baseAccess(status: PremiumAccessStatus, reason: string, walletAddress: 
     confirmations: 0,
     providerCount: 0,
     reason,
+    supplyReferenceRaw: null,
+    requiredBalanceRaw: null,
+    balanceRaw: null,
+    tokenDecimals: null,
+    supplyReferenceBlock: null,
   };
 }
 
-function resultAccess(result: TokenGateOnchainResult, nowSeconds: number): PremiumAccess {
+function referenceFields(reference: SupplyReference, balanceRaw: string | null) {
+  return {
+    supplyReferenceRaw: reference.supply_raw,
+    requiredBalanceRaw: ((BigInt(reference.supply_raw) * BigInt(PREMIUM_HOLDER_THRESHOLD_BPS) + 9_999n) / 10_000n).toString(),
+    balanceRaw,
+    tokenDecimals: reference.decimals,
+    supplyReferenceBlock: reference.block_number,
+  };
+}
+
+function resultAccess(result: TokenGateOnchainResult, nowSeconds: number, reference: SupplyReference): PremiumAccess {
   const status: PremiumAccessStatus = result.eligible ? "active" : "below_threshold";
   const expiresAt = nowSeconds + TOKEN_GATE_CACHE_SECONDS;
   return {
     ...baseAccess(status, result.eligible
-        ? "Wallet meets the 0.05% holder threshold at the verified block."
-        : "Wallet is linked, but the current balance is below the 0.05% holder threshold.", result.walletAddress),
+        ? "Wallet meets the 0.1% holder threshold at the verified block."
+        : "Wallet is linked, but the current balance is below the 0.1% holder threshold.", result.walletAddress),
     checkedAt: iso(nowSeconds),
     expiresAt: iso(expiresAt),
     blockNumber: result.blockNumber,
     confirmations: result.confirmations,
     providerCount: result.providerCount,
+    ...referenceFields(reference, result.balanceRaw),
   };
 }
 
@@ -181,21 +205,22 @@ async function upsertTokenGrant(db: D1Database, userId: string, nowSeconds: numb
   `).bind(`token-holder:${userId}`, userId, reference, nowSeconds, endsAt, nowSeconds).run();
 }
 
-function checkAccess(row: GateCheckRow): PremiumAccess {
+function checkAccess(row: GateCheckRow, reference: SupplyReference): PremiumAccess {
   const status: PremiumAccessStatus = row.status === "eligible" && row.eligible
     ? "active"
     : row.status === "below_threshold" ? "below_threshold" : "verification_unavailable";
   return {
     ...baseAccess(status, status === "active"
-      ? "Wallet meets the 0.05% holder threshold at the verified block."
+      ? "Wallet meets the 0.1% holder threshold at the verified block."
       : status === "below_threshold"
-        ? "Wallet is linked, but the current balance is below the 0.05% holder threshold."
+        ? "Wallet is linked, but the current balance is below the 0.1% holder threshold."
         : "The holder check could not reach a safe provider quorum. Premium access remains locked.", row.wallet_address),
     checkedAt: iso(row.checked_at),
     expiresAt: iso(row.expires_at),
     blockNumber: row.block_number,
     confirmations: row.confirmations,
     providerCount: row.provider_count,
+    ...referenceFields(reference, row.balance_raw),
   };
 }
 
@@ -220,15 +245,15 @@ export async function evaluatePremiumAccess(input: {
   const wallet = await input.db.prepare(`
     SELECT wallet_address, chain_id
     FROM linked_wallets
-    WHERE user_id = ? AND is_primary = 1
+    WHERE user_id = ? AND is_primary = 1 AND (? != 'privy' OR source = 'privy')
     ORDER BY verified_at DESC
     LIMIT 1
-  `).bind(input.userId).first<LinkedWalletRow>();
+  `).bind(input.userId, String(input.bindings?.MEMETIC_AUTH_MODE ?? "")).first<LinkedWalletRow>();
   if (!wallet) {
     await revokeTokenGrant(input.db, input.userId, nowSeconds);
     return {
       adapter,
-      access: baseAccess("wallet_required", "Link a wallet to verify the 0.05% holder threshold."),
+      access: baseAccess("wallet_required", "Link a wallet to verify the 0.1% holder threshold."),
     };
   }
   if (wallet.chain_id !== TOKEN_GATE_CHAIN_ID) {
@@ -239,14 +264,22 @@ export async function evaluatePremiumAccess(input: {
     };
   }
 
-  if (!input.force) {
+  let reference: SupplyReference | null;
+  try {
+    reference = await readSupplyReference(input.db, adapter.contractAddress);
+  } catch {
+    await revokeTokenGrant(input.db, input.userId, nowSeconds);
+    return { adapter, access: baseAccess("verification_unavailable", "The supply reference is temporarily unavailable. Premium remains locked.", wallet.wallet_address) };
+  }
+
+  if (!input.force && reference) {
     try {
       const cached = await input.db.prepare(`
         SELECT wallet_address, chain_id, contract_address, status, eligible, threshold_bps,
-               block_number, confirmations, provider_count, checked_at, expires_at
+               block_number, confirmations, provider_count, checked_at, expires_at, balance_raw
         FROM token_gate_checks
         WHERE user_id = ? AND chain_id = ? AND contract_address = ? AND wallet_address = ?
-          AND threshold_bps = ? AND provider_count >= ? AND expires_at > ?
+          AND threshold_bps = ? AND provider_count >= ? AND confirmations >= 2 AND expires_at > ?
         LIMIT 1
       `).bind(
         input.userId,
@@ -258,7 +291,7 @@ export async function evaluatePremiumAccess(input: {
         nowSeconds,
       ).first<GateCheckRow>();
       if (cached) {
-        const access = checkAccess(cached);
+        const access = checkAccess(cached, reference);
         try {
           if (access.active) {
             await upsertTokenGrant(input.db, input.userId, nowSeconds, cached.expires_at, `holder-check:${cached.block_number ?? "latest"}`);
@@ -289,6 +322,9 @@ export async function evaluatePremiumAccess(input: {
       bindings: input.bindings,
       fetcher: input.fetcher,
     });
+    reference = reference ?? await pinSupplyReference(input.db, result, nowSeconds);
+    if (reference.decimals !== result.decimals) throw new Error("token_gate_decimals_changed");
+    result.eligible = qualifiesForPremium(BigInt(result.balanceRaw), BigInt(reference.supply_raw));
     const expiresAt = nowSeconds + TOKEN_GATE_CACHE_SECONDS;
     const persisted = await persistCheckSafe(input.db, input.userId, {
       walletAddress: result.walletAddress,
@@ -316,7 +352,7 @@ export async function evaluatePremiumAccess(input: {
     } else {
       await revokeTokenGrant(input.db, input.userId, nowSeconds);
     }
-    return { adapter, access: resultAccess(result, nowSeconds) };
+    return { adapter, access: resultAccess(result, nowSeconds, reference) };
   } catch (error) {
     const expiresAt = nowSeconds + TOKEN_GATE_ERROR_CACHE_SECONDS;
     const errorCode = (error instanceof Error ? error.message : "token_gate_unavailable")

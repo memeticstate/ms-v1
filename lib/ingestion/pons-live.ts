@@ -8,12 +8,9 @@ import {
   loadPonsIndexState,
   markPonsIndexFailure,
   markPonsIndexSuccess,
-  pendingPonsMetadata,
   persistPonsLogs,
-  prunePonsObservations,
   recordPonsActivitySnapshot,
   rewindPonsIndex,
-  updatePonsMetadata,
 } from "@/db/pons-ledger";
 import {
   completeCollectionRun,
@@ -26,15 +23,13 @@ import {
   type CollectionTrigger,
 } from "@/db/engine-ledger";
 import { PONS_FINALITY_BLOCKS, PONS_V2_DEPLOYMENT_FLOOR } from "@/lib/pons/constants";
-import { getPonsBlock, getPonsHead, getPonsLogs, readPonsTokenMetadata } from "@/lib/ingestion/pons-rpc";
+import { getPonsBlock, getPonsHead, getPonsLogs } from "@/lib/ingestion/pons-rpc";
 import { ponsCollectionBudget } from "@/lib/pons/budget";
 
 const LOG_CHUNK_BLOCKS = 2_000;
 const REORG_REWIND_BLOCKS = 256;
 const LIVE_RPC_CONCURRENCY = 2;
-const METADATA_BUDGET_MS = 1_500;
-const MATERIALIZATION_START_DEADLINE_MS = 21_000;
-const MAINTENANCE_START_DEADLINE_MS = 27_000;
+
 
 function ranges(fromBlock: number, toBlock: number, size = LOG_CHUNK_BLOCKS) {
   const result: Array<{ fromBlock: number; toBlock: number }> = [];
@@ -57,25 +52,6 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
   return result;
 }
 
-function collectionErrorCode(error: unknown) {
-  return (error instanceof Error ? error.message : "metadata unavailable")
-    .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96) || "unknown";
-}
-
-async function withinMilliseconds<T>(promise: Promise<T>, milliseconds: number) {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error("metadata_budget_exhausted")), milliseconds);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
 export async function runPonsCollection(trigger: CollectionTrigger, options: { force?: boolean } = {}) {
   const acquired = await acquirePonsIndexLease({ force: options.force });
   if (!acquired) return { status: "skipped" as const, reason: "fresh PONS index or active lease" };
@@ -85,8 +61,9 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
   try {
     run = await startCollectionRun(trigger, "pons-index");
     const startedAt = Date.now();
+    const rpcDeadline = startedAt + 20_000;
     await updateRunPhase(run.id, phase);
-    const head = await getPonsHead();
+    const head = await getPonsHead(rpcDeadline);
     const safeHead = Math.max(PONS_V2_DEPLOYMENT_FLOOR, head.number - PONS_FINALITY_BLOCKS);
     let state = await initializePonsIndex(head.number);
     if (!state) throw new Error("pons_index_state_missing");
@@ -94,7 +71,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
     if (state.latest_safe_block > 0 && state.latest_safe_hash) {
       phase = "reorg-check";
       await updateRunPhase(run.id, phase, { latestSafeBlock: state.latest_safe_block });
-      const canonical = await getPonsBlock(state.latest_safe_block);
+      const canonical = await getPonsBlock(state.latest_safe_block, false, rpcDeadline);
       if (canonical.hash !== state.latest_safe_hash.toLowerCase()) {
         const rewindBlock = Math.max(PONS_V2_DEPLOYMENT_FLOOR, state.latest_safe_block - REORG_REWIND_BLOCKS);
         await rewindPonsIndex(rewindBlock);
@@ -112,12 +89,16 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
     await updateRunPhase(run.id, phase, {
       strategy: budget.strategy, lagBefore, liveFrom, liveTo, chunks: liveRanges.length,
     });
-    if (liveRanges.length) await clearPonsStagedRange(liveFrom);
+    if (liveRanges.length) await clearPonsStagedRange(liveFrom, liveTo);
     const liveBatches = await mapWithConcurrency(
       liveRanges,
       LIVE_RPC_CONCURRENCY,
-      (range) => getPonsLogs(range.fromBlock, range.toBlock),
+      (range) => getPonsLogs(range.fromBlock, range.toBlock, false, rpcDeadline),
     );
+    // Resolve the commit hash before database writes. A busy database must not
+    // consume the RPC budget and force an otherwise complete batch to retry.
+    const latestProcessed = liveRanges.length ? liveTo : state.latest_safe_block;
+    const latestBlock = latestProcessed > 0 ? await getPonsBlock(latestProcessed, false, rpcDeadline) : { hash: head.hash };
     let launchCount = 0;
     let lifecycleCount = 0;
     let tradeCount = 0;
@@ -144,7 +125,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       await updateRunPhase(run.id, phase, {
         strategy: budget.strategy, fromBlock: backfillNext, toBlock: historyTo, chunks: historyRanges.length,
       });
-      const historicalBatches = await Promise.all(historyRanges.map((range) => getPonsLogs(range.fromBlock, range.toBlock, true)));
+      const historicalBatches = await Promise.all(historyRanges.map((range) => getPonsLogs(range.fromBlock, range.toBlock, true, rpcDeadline)));
       for (const historical of historicalBatches.sort((left, right) => left.fromBlock - right.fromBlock)) {
         const persisted = await persistPonsLogs({
           factoryLogs: historical.factoryLogs,
@@ -159,8 +140,6 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
     }
 
     phase = "commit";
-    const latestProcessed = liveRanges.length ? liveTo : state.latest_safe_block;
-    const latestBlock = latestProcessed > 0 ? await getPonsBlock(latestProcessed) : { hash: head.hash };
     const recordCount = launchCount + lifecycleCount + tradeCount;
     const liveBlocksProcessed = liveRanges.length ? liveTo - liveFrom + 1 : 0;
     const historicalBlocksProcessed = historicalTo === null ? 0 : historicalTo - historicalFrom + 1;
@@ -173,26 +152,8 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       recordCount,
     });
 
-    phase = "metadata";
-    let pending: Array<{ tokenAddress: string }> = [];
-    let metadata: Awaited<ReturnType<typeof readPonsTokenMetadata>> = {
-      records: [], provider: "unavailable", latencyMs: 0,
-    };
-    let metadataErrorCode: string | null = null;
-    try {
-      await updateRunPhase(run.id, phase, {
-        pendingLimit: budget.metadataLimit, priority: "observed-trades", budgetMs: METADATA_BUDGET_MS,
-      });
-      if (budget.metadataLimit > 0) {
-        pending = await pendingPonsMetadata(budget.metadataLimit);
-        metadata = await withinMilliseconds(readPonsTokenMetadata(pending), METADATA_BUDGET_MS);
-        await updatePonsMetadata(metadata.records);
-      }
-    } catch (error) {
-      metadataErrorCode = collectionErrorCode(error);
-    }
-
-    const metadataResolved = metadata.records.filter((record) => record.ok).length;
+    const metadataResolved = 0;
+    const metadataErrorCode: string | null = null;
     const runMetadata = {
       source: "pons-v2",
       strategy: budget.strategy,
@@ -207,11 +168,11 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       historicalTo,
       historicalBlocksProcessed,
       recordCount,
-      metadataRequested: pending.length,
+      metadataRequested: 0,
       metadataResolved,
-      metadataProvider: metadata.provider,
+      metadataProvider: "separate-lane",
       metadataErrorCode,
-      metadataBudgetMs: METADATA_BUDGET_MS,
+      metadataBudgetMs: 0,
     };
     await recordSourceObservation(run.id, {
       source: "pons-v2-rpc",
@@ -244,33 +205,6 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       metadata: runMetadata,
     });
     await resolveEngineAlert("pons_collection_failed", "collector", "pons-v2").catch(() => undefined);
-    const elapsedBeforeMaterialization = Date.now() - startedAt;
-    if (elapsedBeforeMaterialization <= MATERIALIZATION_START_DEADLINE_MS) {
-      const materializationStartedAt = Date.now();
-      try {
-        const materializedState = await getPonsState();
-        await Promise.all([
-          recordPonsActivitySnapshot(head.number, materializedState),
-          cachePonsState(materializedState),
-        ]);
-        console.info("PONS state materialized", {
-          indexedBlock: materializedState.index.latestIndexedBlock,
-          durationMs: Date.now() - materializationStartedAt,
-        });
-      } catch (error) {
-        console.error("PONS state materialization failed", {
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    } else {
-      console.info("PONS state materialization deferred", {
-        latestProcessed,
-        elapsedMs: elapsedBeforeMaterialization,
-      });
-    }
-    if (Date.now() - startedAt <= MAINTENANCE_START_DEADLINE_MS) {
-      await prunePonsObservations().catch(() => undefined);
-    }
     return {
       status: "recorded" as const,
       headBlock: head.number,
@@ -278,7 +212,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       launches: launchCount,
       lifecycleEvents: lifecycleCount,
       trades: tradeCount,
-      metadata: metadata.records.length,
+      metadata: 0,
       metadataErrorCode,
       strategy: budget.strategy,
       liveBlocksProcessed,
@@ -307,6 +241,41 @@ export async function runRequestPonsCollection(force = false) {
   return runPonsCollection(force ? "manual" : "request-watchdog", { force });
 }
 
-export async function servePonsState(windowBlocks?: number) {
-  return await loadCachedPonsState(windowBlocks) ?? getPonsState(windowBlocks);
+export async function materializePonsState(windowBlocks?: number) {
+  const { acquireAuxJob, releaseAuxJob } = await import("@/db/pons-research");
+  if (!await acquireAuxJob("materialize", 20_000)) return null;
+  try {
+    const state = await getPonsState(windowBlocks);
+    await cachePonsState(state);
+    await recordPonsActivitySnapshot(state.index.latestSeenBlock, state);
+    return state;
+  } finally { await releaseAuxJob("materialize"); }
+}
+
+export async function servePonsState(windowBlocks?: number, token?: string, browse?: { pair?: string; phase?: string }, background?: (task: Promise<unknown>) => void) {
+  const { decorateResearch } = await import("@/db/pons-research");
+  const [cached, progress] = await Promise.all([loadCachedPonsState(windowBlocks), loadPonsIndexState()]);
+  let state = cached;
+  // Rebuilding large historical aggregates after every small archive commit
+  // blocks the same D1 database needed by the recent-event feed. Keep the dated
+  // artifact for five minutes during deep recovery; progress still updates now.
+  const refreshAfter = progress && progress.latest_seen_block - progress.latest_safe_block > 40_000 ? 300_000 : 30_000;
+  // Rebuild in its own request lifetime when the artifact falls behind a commit.
+  // Never relabel a cached artifact with a newer block than its actual evidence.
+  if (!state || progress && progress.latest_safe_block !== state.index.latestIndexedBlock && Date.now() - Date.parse(state.generatedAt) > refreshAfter) {
+    const rebuild = materializePonsState(windowBlocks);
+    if (state && background) background(rebuild.catch(() => console.error("PONS snapshot refresh unavailable")));
+    else state = await rebuild ?? state;
+  }
+  if (!state) state = await getPonsState(windowBlocks);
+  if (progress) {
+    state.collectionProgress = { indexedBlock: progress.latest_safe_block, headBlock: progress.latest_seen_block,
+      lagBlocks: Math.max(0, progress.latest_seen_block - progress.latest_safe_block),
+      lastSuccessAt: progress.last_success_at ? new Date(progress.last_success_at).toISOString() : null };
+    state.index.consecutiveFailures = progress.consecutive_failures;
+    state.index.latestSeenBlock = Math.max(state.index.latestSeenBlock, progress.latest_seen_block);
+    state.index.liveLagBlocks = Math.max(0, state.index.latestSeenBlock - state.index.latestIndexedBlock);
+  }
+  const { loadFactoryFeed } = await import("@/db/pons-factory");
+  return decorateResearch({ ...state, factoryLive: await loadFactoryFeed() }, token, browse);
 }

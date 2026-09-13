@@ -1,12 +1,14 @@
 import { servePonsState } from "@/lib/ingestion/pons-live";
 
-export async function GET(request: Request) {
+export async function GET(request: Request, background?: (task: Promise<unknown>) => void) {
   try {
     const url = new URL(request.url);
     const requestedWindow = Number(url.searchParams.get("window"));
     const windowBlocks = Number.isFinite(requestedWindow) && requestedWindow > 0 ? requestedWindow : undefined;
-    return Response.json(await servePonsState(windowBlocks), {
-      headers: { "cache-control": "public, max-age=15, stale-while-revalidate=45" },
+    return Response.json(await servePonsState(windowBlocks, url.searchParams.get("token") ?? undefined, {
+      pair: url.searchParams.get("pair")?.slice(0, 32), phase: url.searchParams.get("phase") ?? undefined,
+    }, typeof background === "function" ? background : undefined), {
+      headers: { "cache-control": "no-store" },
     });
   } catch (error) {
     return Response.json({

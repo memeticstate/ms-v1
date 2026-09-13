@@ -1,0 +1,18 @@
+.search { position: relative; flex: 1; min-width: 0; font-family: inherit; --search-bg: var(--background); --search-fg: var(--foreground); --search-muted: var(--muted-foreground); --search-border: color-mix(in srgb, var(--foreground) 25%, transparent); --search-hover: color-mix(in srgb, var(--foreground) 8%, var(--background)); }
+.search[data-appearance="landing"] { --search-bg: #15140f; --search-fg: #ede6d5; --search-muted: #b7b5a9; --search-border: #ede6d56a; --search-hover: #303327; }
+.search .command { overflow: visible; border: 1px solid var(--search-border); border-radius: .3rem; background: var(--search-bg); color: var(--search-fg); height: auto; }
+.command [data-slot="command-input-wrapper"] { height: 3.3rem; border: 0; padding: 0 1rem; }
+.command [data-slot="command-input"] { height: 3.3rem; font-size: 1rem; color: var(--search-fg); background: transparent; min-width: 0; }
+.command input::placeholder { color: var(--search-muted); opacity: 1; }
+.search:focus-within .command { outline: 2px solid #8fa876; outline-offset: 2px; }
+.search .results { position: absolute; inset: calc(100% + .5rem) 0 auto; z-index: 60; max-height: min(27rem, 65dvh); border: 1px solid var(--search-border); border-radius: .35rem; background: var(--search-bg); color: var(--search-fg); box-shadow: 0 14px 35px #0005; overflow-y: auto; overscroll-behavior: contain; padding: .35rem; }
+.searchStatus, .empty { padding: .7rem; font-size: .875rem; color: var(--search-muted); line-height: 1.5; }
+.search .result { padding: .7rem; display: flex; gap: .85rem; cursor: pointer; color: var(--search-fg); }
+.search .result[data-selected="true"], .search .addressAction[data-selected="true"] { background: var(--search-hover); color: var(--search-fg); }
+.avatar { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex: none; overflow: hidden; border-radius: .3rem; background: #b9c8a2; color: #15140f; font-weight: 700; }
+.identity { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: .1rem; }
+.identity strong { font-size: 1rem; overflow-wrap: anywhere; }
+.identity span { font-size: .875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity code { font-size: .75rem; color: var(--search-muted); }
+.source { font-size: .75rem; color: var(--search-muted); }
+.search .addressAction { padding: .8rem; font-size: .9375rem; color: var(--search-fg); cursor: pointer; }

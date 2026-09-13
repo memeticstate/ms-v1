@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { ensureMemberProfile, readEntitlementProfile } from "@/lib/entitlements/server";
+import { authErrorResponse } from "@/lib/auth/config";
+import { authenticateMember } from "@/lib/auth/server";
+import { readEntitlementProfile } from "@/lib/entitlements/server";
 import { rejectCrossSiteMutation } from "@/lib/entitlements/request-security";
 
 const address = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase());
@@ -38,14 +39,21 @@ const watch = z.object({
   })).max(20),
 });
 
-async function authenticatedUser() {
-  const user = await getChatGPTUser();
-  if (user) await ensureMemberProfile(env.DB, user);
-  return user;
+async function authenticatedUser(request: Request) {
+  return authenticateMember({
+    request,
+    db: env.DB,
+    bindings: env as unknown as Record<string, unknown>,
+  });
 }
 
-export async function GET() {
-  const user = await authenticatedUser();
+export async function GET(request: Request) {
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticatedUser(request);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ authenticated: false, watches: [] }, { status: 401 });
   const result = await env.DB.prepare(`
     SELECT payload_json FROM watchtower_watches
@@ -69,7 +77,12 @@ export async function POST(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > 32_768) {
     return Response.json({ accepted: false, error: "request_too_large" }, { status: 413, headers: { "cache-control": "no-store" } });
   }
-  const user = await authenticatedUser();
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticatedUser(request);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ accepted: false, error: "sign_in_required" }, { status: 401, headers: { "cache-control": "no-store" } });
   const parsed = watch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ accepted: false, error: "invalid_watch" }, { status: 422, headers: { "cache-control": "no-store" } });
@@ -112,7 +125,12 @@ export async function DELETE(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > 4_096) {
     return Response.json({ accepted: false, error: "request_too_large" }, { status: 413, headers: { "cache-control": "no-store" } });
   }
-  const user = await authenticatedUser();
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticatedUser(request);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ accepted: false, error: "sign_in_required" }, { status: 401, headers: { "cache-control": "no-store" } });
   const payload = await request.json().catch(() => null) as { tokenAddress?: unknown } | null;
   const parsedAddress = address.safeParse(payload?.tokenAddress);

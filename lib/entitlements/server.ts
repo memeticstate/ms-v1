@@ -1,4 +1,3 @@
-import type { ChatGPTUser } from "@/app/chatgpt-auth";
 import {
   ENTITLEMENT_CAPABILITIES,
   entitlementPeriodKey,
@@ -32,7 +31,11 @@ function isSource(value: string): value is EntitlementSource {
   return ["public", "founding", "paid", "token", "admin"].includes(value);
 }
 
-export async function ensureMemberProfile(db: D1Database, user: ChatGPTUser) {
+export async function ensureMemberProfile(db: D1Database, user: {
+  id: string;
+  email: string | null;
+  displayName: string;
+}) {
   await db.prepare(`
     INSERT INTO member_profiles (user_id, email, display_name, created_at, updated_at)
     VALUES (?, ?, ?, unixepoch(), unixepoch())
@@ -40,7 +43,7 @@ export async function ensureMemberProfile(db: D1Database, user: ChatGPTUser) {
       email = excluded.email,
       display_name = excluded.display_name,
       updated_at = unixepoch()
-  `).bind(user.id, user.email, user.displayName).run();
+  `).bind(user.id, user.email ?? "", user.displayName).run();
 }
 
 export async function readEntitlementProfile(

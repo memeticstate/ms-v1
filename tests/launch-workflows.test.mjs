@@ -59,6 +59,7 @@ test("watchlist emits one alert per newly crossed research rule", async () => {
   const saved = createWatchEntry(launch, "2026-08-31T00:00:00.000Z");
   const changed = {
     ...launch,
+    research: { eligible: true },
     signal: "surging",
     phase: "graduated",
     recentTrades: 30,
@@ -71,6 +72,8 @@ test("watchlist emits one alert per newly crossed research rule", async () => {
   const repeated = reconcileWatchEntry(first.entry, changed, "2026-08-31T00:06:00.000Z");
   assert.equal(repeated.newAlerts, 0);
   assert.equal(repeated.entry.alerts.length, 4);
+  const suppressed = reconcileWatchEntry(saved, { ...changed, research: { eligible: false } }, "2026-08-31T00:07:00.000Z");
+  assert.equal(suppressed.newAlerts, 0);
 });
 
 test("watchlist parser rejects corrupt local state", async () => {

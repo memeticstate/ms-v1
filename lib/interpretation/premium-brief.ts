@@ -1,4 +1,5 @@
 import type { PonsStateResponse } from "@/lib/pons/model";
+import { currentPonsEvidence } from "@/lib/pons/research";
 
 export type PremiumInterpretation = {
   headline: string;
@@ -23,16 +24,14 @@ function formatPercent(value: number | null) {
 }
 
 export function derivePremiumInterpretation(state: PonsStateResponse): PremiumInterpretation {
-  const leader = state.pulse.leader;
-  const confidence = state.pulse.status === "verified" && state.integrity.pulseReconciled
-    ? "high"
-    : state.pulse.status === "delayed" || state.mode === "degraded" ? "measured" : "early";
-  const headline = leader
-    ? `${leader.tokenSymbol} is the clearest attention cluster in this window.`
-    : "The current window is still forming a clear attention cluster.";
-  const readout = leader
-    ? `${leader.pairSymbol} is carrying the most observed curve activity, with ${leader.recentTrades.toLocaleString()} recent trades. Read this as participation context, not a price or quality signal.`
-    : "Activity is visible, but the current window does not yet support a responsible leader call. Wait for another verified interval before drawing a stronger interpretation.";
+  const current = currentPonsEvidence(state);
+  const leader = current ? state.launches.find((launch) => launch.research?.eligible) : null;
+  const confidence = current ? "measured" : "early";
+  const headline = !current ? "The indexed window supports historical research."
+    : leader ? `${leader.symbol} meets the current participation evidence criteria.`
+      : "No launch yet meets the current participation evidence criteria.";
+  const readout = leader ? `${leader.pairSymbol} habitat · ${leader.research!.reasons.join(" ")}`
+    : "Use the recorded events and their observation times to investigate. A busy or delayed curve does not establish retained participation or a current opportunity.";
   const observations = [
     `Curve activity is ${direction(state.pulse.trades)} at ${state.pulse.trades.current.toLocaleString()} trades (${formatPercent(state.pulse.trades.changePercent)} versus the prior window).`,
     `${state.pulse.uniqueTraders.current.toLocaleString()} distinct actors are visible; breadth is ${direction(state.pulse.uniqueTraders)}.`,

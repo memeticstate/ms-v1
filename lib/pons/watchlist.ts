@@ -94,6 +94,7 @@ function alert(entry: WatchEntry, kind: WatchAlertKind, title: string, detail: s
 export function reconcileWatchEntry(entry: WatchEntry, launch: PonsLaunchView, observedAt: string): { entry: WatchEntry; newAlerts: number } {
   const next = snapshot(launch);
   const alerts: WatchAlert[] = [];
+  if (!launch.research?.eligible) return { entry: { ...entry, name: launch.name, symbol: launch.symbol, lastSeen: next, updatedAt: observedAt }, newAlerts: 0 };
 
   if (entry.rules.signalChange && entry.lastSeen.signal !== next.signal) {
     alerts.push(alert(entry, "signal", `${launch.symbol} changed signal`, `${entry.lastSeen.signal} → ${next.signal}`, observedAt));

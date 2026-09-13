@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { getAddress } from "viem";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { ensureMemberProfile } from "@/lib/entitlements/server";
+import { authErrorResponse, authProviderFromBindings } from "@/lib/auth/config";
+import { authenticateMember } from "@/lib/auth/server";
 import { rejectCrossSiteMutation } from "@/lib/entitlements/request-security";
 import { buildWalletLinkMessage, walletChallengeExpiry } from "@/lib/entitlements/wallet-message";
 
@@ -13,7 +13,23 @@ export async function POST(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > 8_192) {
     return Response.json({ accepted: false, error: "request_too_large" }, { status: 413, headers: { "cache-control": "no-store" } });
   }
-  const user = await getChatGPTUser();
+  const bindings = env as unknown as Record<string, unknown>;
+  try {
+    if (authProviderFromBindings(bindings) === "privy") {
+      return Response.json({ accepted: false, error: "wallet_link_managed_by_privy" }, {
+        status: 410,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticateMember({ request, db: env.DB, bindings });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ accepted: false, error: "sign_in_required" }, { status: 401, headers: { "cache-control": "no-store" } });
 
   let rawAddress = "";
@@ -31,7 +47,6 @@ export async function POST(request: Request) {
     return Response.json({ accepted: false, error: "invalid_wallet_address" }, { status: 422, headers: { "cache-control": "no-store" } });
   }
 
-  await ensureMemberProfile(env.DB, user);
   const id = crypto.randomUUID();
   const issuedAt = Math.floor(Date.now() / 1_000);
   const recent = await env.DB.prepare(`

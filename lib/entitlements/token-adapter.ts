@@ -1,6 +1,6 @@
 export const TOKEN_GATE_CHAIN_ID = 4663;
-export const PREMIUM_HOLDER_THRESHOLD_BPS = 5;
-export const TOKEN_GATE_CACHE_SECONDS = 10 * 60;
+export const PREMIUM_HOLDER_THRESHOLD_BPS = 10;
+export const TOKEN_GATE_CACHE_SECONDS = 2 * 60;
 export const TOKEN_GATE_ERROR_CACHE_SECONDS = 60;
 
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
@@ -8,6 +8,7 @@ const HEX = /^0x[0-9a-f]+$/i;
 const RPC_TIMEOUT_MS = 4_500;
 const DEFAULT_QUORUM = 2;
 const MAX_BLOCK_SKEW = 12;
+const BLOCK_DEPTH = 2;
 const TOTAL_SUPPLY_SELECTOR = "0x18160ddd";
 const BALANCE_OF_SELECTOR = "0x70a08231";
 
@@ -27,7 +28,7 @@ export type TokenAdapterStatus = {
   chainId: typeof TOKEN_GATE_CHAIN_ID;
   contractAddress: string | null;
   thresholdBps: typeof PREMIUM_HOLDER_THRESHOLD_BPS;
-  thresholdPercent: "0.05%";
+  thresholdPercent: "0.1%";
   quorum: number;
   providerCount: number;
   reason: string;
@@ -40,6 +41,7 @@ export type TokenGateOnchainResult = {
   chainId: typeof TOKEN_GATE_CHAIN_ID;
   balanceRaw: string;
   totalSupplyRaw: string;
+  decimals: number;
   thresholdBps: typeof PREMIUM_HOLDER_THRESHOLD_BPS;
   blockNumber: number;
   confirmations: number;
@@ -57,7 +59,10 @@ function configuredProviders(bindings: Record<string, unknown>): TokenRpcProvide
   const providers = [...urls.map((url, index) => ({ name: `managed-${index + 1}`, url })), ...DEFAULT_PROVIDERS];
   const unique = new Map<string, TokenRpcProvider>();
   for (const provider of providers) {
-    if (/^https:\/\//i.test(provider.url)) unique.set(provider.url, provider);
+    try {
+      const url = new URL(provider.url);
+      if (url.protocol === "https:" && !unique.has(url.origin)) unique.set(url.origin, provider);
+    } catch { /* Invalid configured providers cannot contribute to quorum. */ }
   }
   return [...unique.values()];
 }
@@ -89,7 +94,7 @@ export function tokenAdapterStatus(bindings: Record<string, unknown> = {}): Toke
       chainId: TOKEN_GATE_CHAIN_ID,
       contractAddress,
       thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-      thresholdPercent: "0.05%",
+      thresholdPercent: "0.1%",
       quorum,
       providerCount,
       reason: "Premium holder access is paused until the token gate is enabled.",
@@ -102,7 +107,7 @@ export function tokenAdapterStatus(bindings: Record<string, unknown> = {}): Toke
       chainId: TOKEN_GATE_CHAIN_ID,
       contractAddress: null,
       thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-      thresholdPercent: "0.05%",
+      thresholdPercent: "0.1%",
       quorum,
       providerCount,
       reason: "The holder gate needs the token contract address before it can verify ownership.",
@@ -115,7 +120,7 @@ export function tokenAdapterStatus(bindings: Record<string, unknown> = {}): Toke
       chainId: TOKEN_GATE_CHAIN_ID,
       contractAddress,
       thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-      thresholdPercent: "0.05%",
+      thresholdPercent: "0.1%",
       quorum,
       providerCount,
       reason: "The holder gate needs enough independent RPC providers for a safe consensus check.",
@@ -127,7 +132,7 @@ export function tokenAdapterStatus(bindings: Record<string, unknown> = {}): Toke
     chainId: TOKEN_GATE_CHAIN_ID,
     contractAddress,
     thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-    thresholdPercent: "0.05%",
+    thresholdPercent: "0.1%",
     quorum,
     providerCount,
     reason: "Holder access is checked against a quorum of Robinhood Chain RPC providers.",
@@ -154,31 +159,53 @@ function balanceOfData(walletAddress: string) {
   return `${BALANCE_OF_SELECTOR}${walletAddress.slice(2).toLowerCase().padStart(64, "0")}`;
 }
 
-async function readProvider(provider: TokenRpcProvider, contractAddress: string, walletAddress: string, fetcher: typeof fetch) {
+async function rpcBatch(provider: TokenRpcProvider, calls: Array<{ method: string; params: unknown[] }>, fetcher: typeof fetch) {
   const response = await fetcher(provider.url, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/json" },
-    body: JSON.stringify([
-      { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] },
-      { jsonrpc: "2.0", id: 2, method: "eth_blockNumber", params: [] },
-      { jsonrpc: "2.0", id: 3, method: "eth_call", params: [{ to: contractAddress, data: TOTAL_SUPPLY_SELECTOR }, "latest"] },
-      { jsonrpc: "2.0", id: 4, method: "eth_call", params: [{ to: contractAddress, data: balanceOfData(walletAddress) }, "latest"] },
-    ]),
+    body: JSON.stringify(calls.map((call, index) => ({ jsonrpc: "2.0", id: index + 1, ...call }))),
     signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`token_gate_http_${response.status}`);
   const payload = await response.json() as unknown;
-  if (!Array.isArray(payload)) throw new Error("token_gate_invalid_rpc_batch");
+  if (!Array.isArray(payload) || payload.length !== calls.length) throw new Error("token_gate_invalid_rpc_batch");
   const byId = new Map((payload as RpcEnvelope[]).map((item) => [item.id, item]));
+  if (byId.size !== calls.length || calls.some((_, index) => !byId.has(index + 1))) throw new Error("token_gate_incomplete_rpc_batch");
   const failed = [...byId.values()].find((item) => item.error);
   if (failed?.error) throw new Error(`token_gate_rpc_${failed.error.code ?? "error"}`);
+  return byId;
+}
+
+async function readHead(provider: TokenRpcProvider, fetcher: typeof fetch) {
+  const byId = await rpcBatch(provider, [
+    { method: "eth_chainId", params: [] },
+    { method: "eth_blockNumber", params: [] },
+  ], fetcher);
   const chainId = hexNumber(byId.get(1)?.result, "chain");
   if (chainId !== TOKEN_GATE_CHAIN_ID) throw new Error("token_gate_chain_mismatch");
+  return { provider, blockNumber: hexNumber(byId.get(2)?.result, "block") };
+}
+
+async function readProvider(provider: TokenRpcProvider, contractAddress: string, walletAddress: string, blockNumber: number, fetcher: typeof fetch) {
+  const block = `0x${blockNumber.toString(16)}`;
+  const byId = await rpcBatch(provider, [
+    { method: "eth_call", params: [{ to: contractAddress, data: TOTAL_SUPPLY_SELECTOR }, block] },
+    { method: "eth_call", params: [{ to: contractAddress, data: balanceOfData(walletAddress) }, block] },
+    { method: "eth_call", params: [{ to: contractAddress, data: "0x313ce567" }, block] },
+    { method: "eth_getBlockByNumber", params: [block, false] },
+  ], fetcher);
+  const header = byId.get(4)?.result as { hash?: unknown; number?: unknown } | null;
+  if (!header || typeof header.hash !== "string" || !/^0x[0-9a-f]{64}$/i.test(header.hash)
+    || hexNumber(header.number, "block") !== blockNumber) throw new Error("token_gate_invalid_block_header");
+  const decimals = hexNumber(byId.get(3)?.result, "decimals");
+  if (decimals > 36) throw new Error("token_gate_invalid_decimals");
   return {
     provider: provider.name,
-    blockNumber: hexNumber(byId.get(2)?.result, "block"),
-    totalSupply: hexBigInt(byId.get(3)?.result, "total_supply"),
-    balance: hexBigInt(byId.get(4)?.result, "balance"),
+    blockNumber,
+    blockHash: header.hash.toLowerCase(),
+    totalSupply: hexBigInt(byId.get(1)?.result, "total_supply"),
+    balance: hexBigInt(byId.get(2)?.result, "balance"),
+    decimals,
   };
 }
 
@@ -200,21 +227,26 @@ export async function readTokenGateOnchain(input: {
   if (!contractAddress) throw new Error("token_gate_contract_missing");
   if (!gateRequested(bindings)) throw new Error("token_gate_disabled");
   const quorum = configuredQuorum(bindings);
-  const providerResults = await Promise.allSettled(
-    configuredProviders(bindings).map((provider) => readProvider(provider, contractAddress, walletAddress, input.fetcher ?? fetch)),
-  );
+  const fetcher = input.fetcher ?? fetch;
+  const heads = (await Promise.allSettled(configuredProviders(bindings).map((provider) => readHead(provider, fetcher))))
+    .flatMap((result) => result.status === "fulfilled" ? [result.value] : [])
+    .sort((a, b) => b.blockNumber - a.blockNumber);
+  const cluster = heads.map((head) => heads.filter((candidate) => candidate.blockNumber <= head.blockNumber
+    && head.blockNumber - candidate.blockNumber <= MAX_BLOCK_SKEW)).find((group) => group.length >= quorum);
+  if (!cluster) throw new Error("token_gate_head_quorum_unavailable");
+  const blockNumber = Math.min(...cluster.map((head) => head.blockNumber)) - BLOCK_DEPTH;
+  if (blockNumber < 0) throw new Error("token_gate_block_unavailable");
+  const providerResults = await Promise.allSettled(cluster.map(({ provider }) =>
+    readProvider(provider, contractAddress, walletAddress, blockNumber, fetcher)));
   const successful = providerResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
   if (successful.length < quorum) throw new Error("token_gate_quorum_unavailable");
   const groups = new Map<string, typeof successful>();
   for (const result of successful) {
-    const key = `${result.totalSupply.toString()}:${result.balance.toString()}`;
+    const key = `${result.blockHash}:${result.totalSupply.toString()}:${result.balance.toString()}:${result.decimals}`;
     groups.set(key, [...(groups.get(key) ?? []), result]);
   }
   const consensus = [...groups.values()].sort((left, right) => right.length - left.length)[0];
   if (!consensus || consensus.length < quorum) throw new Error("token_gate_quorum_mismatch");
-  const minBlock = Math.min(...consensus.map((result) => result.blockNumber));
-  const maxBlock = Math.max(...consensus.map((result) => result.blockNumber));
-  if (maxBlock - minBlock > MAX_BLOCK_SKEW) throw new Error("token_gate_block_skew");
   const balanceRaw = consensus[0].balance;
   const totalSupplyRaw = consensus[0].totalSupply;
   if (totalSupplyRaw <= 0n || balanceRaw > totalSupplyRaw) {
@@ -227,9 +259,10 @@ export async function readTokenGateOnchain(input: {
     chainId: TOKEN_GATE_CHAIN_ID,
     balanceRaw: balanceRaw.toString(),
     totalSupplyRaw: totalSupplyRaw.toString(),
+    decimals: consensus[0].decimals,
     thresholdBps: PREMIUM_HOLDER_THRESHOLD_BPS,
-    blockNumber: minBlock,
-    confirmations: 0,
+    blockNumber,
+    confirmations: BLOCK_DEPTH,
     providerCount: consensus.length,
     providers: consensus.map((result) => result.provider),
   };

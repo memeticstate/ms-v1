@@ -15,9 +15,10 @@ test("public snapshot traffic is read-only", async () => {
 });
 
 test("worker schedules collection every minute", async () => {
-  const [worker, config, cycle] = await Promise.all([
+  const [worker, config, wrangler, cycle] = await Promise.all([
     source("worker/index.ts"),
     source("vite.config.ts"),
+    source("wrangler.jsonc"),
     source("lib/ingestion/collector-cycle.ts"),
   ]);
   assert.match(worker, /async scheduled/);
@@ -28,7 +29,26 @@ test("worker schedules collection every minute", async () => {
   assert.match(cycle, /Give each expensive lane its own Worker invocation budget/);
   assert.match(cycle, /v1-current/);
   assert.match(cycle, /v1-legacy/);
-  assert.match(config, /crons: \["\* \* \* \* \*"\]/);
+  assert.match(config, /configPath: "\.\/wrangler\.jsonc"/);
+  assert.match(wrangler, /"crons": \["\* \* \* \* \*"\]/);
+});
+
+test("failed upstream responses release their bodies", async () => {
+  const [resilientFetch, rpcTransport, ponsResearch] = await Promise.all([
+    source("lib/ingestion/resilient-fetch.ts"),
+    source("lib/ingestion/rpc-transport.ts"),
+    source("lib/ingestion/pons-research.ts"),
+  ]);
+  assert.match(resilientFetch, /response\.body\?\.cancel\(\)/);
+  assert.match(rpcTransport, /response\.body\?\.cancel\(\)/);
+  assert.match(ponsResearch, /response\.body\?\.cancel\(\)/);
+});
+
+test("collector endpoints acknowledge before long work settles", async () => {
+  const worker = await source("worker/index.ts");
+  assert.match(worker, /settled: false/);
+  assert.match(worker, /ctx\.waitUntil\(work\.catch/);
+  assert.match(worker, /status: 202/);
 });
 
 test("public PONS state reads stay separate from the collection heartbeat", async () => {

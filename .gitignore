@@ -40,3 +40,23 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
+
+# Authored documentation and local publishing inputs stay out of source control.
+/docs/
+/content/gitbook/
+/.gitbook.yaml
+*.md
+*.mdx
+# Keep license notices and repository instructions.
+!**/LICENSE.md
+!**/*.LICENSE.md
+!AGENTS.md
+!SKILL.md
+
+# Local publication bundles and runtime credentials.
+/*-github-release.zip
+/*-github-payload.json
+.dev.vars*
+*.key
+*.p12
+*.pfx

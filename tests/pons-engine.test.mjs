@@ -25,6 +25,58 @@ const { classifyPonsSignal, normalizePonsWindowBlocks, ponsMomentumPercent, pons
 const { assessRobinhoodRpcQuorum } = await vite.ssrLoadModule("/lib/ingestion/rpc-quorum.ts");
 const { ponsCollectionBudget, PONS_MAX_BLOCKS_PER_RUN } = await vite.ssrLoadModule("/lib/pons/budget.ts");
 const { isRetryablePonsRpcError } = await vite.ssrLoadModule("/lib/ingestion/pons-rpc.ts");
+const { assessLaunch, currentPonsEvidence } = await vite.ssrLoadModule("/lib/pons/research.ts");
+const { rpcEnvelopes } = await vite.ssrLoadModule("/lib/ingestion/rpc-transport.ts");
+
+const now = Date.parse("2026-09-07T17:00:00Z");
+const viable = { phase: "bonding", recentTrades: 40, previousTrades: 20, recentUniqueTraders: 15,
+  previousUniqueTraders: 10, recentBuys: 30, recentSells: 10, netQuoteFlow: 100,
+  lastTradeAt: new Date(now - 30_000).toISOString(), currentEvidence: {
+    observedAt: new Date(now - 30_000).toISOString(), meaningfulHolders: 12, largestWalletSharePercent: 2,
+    reserveSharePercent: 50, holdersComplete: false, holderSampleSize: 24,
+  } };
+
+test("historical Robinhouse and Verse activity never creates a current score", () => {
+  for (const [recentTrades, previousTrades, recentUniqueTraders] of [[297, 0, 23], [278, 114, 20]]) {
+    const result = assessLaunch({ ...viable, recentTrades, previousTrades, recentUniqueTraders }, false, now);
+    assert.equal(result.signal, "historical"); assert.equal(result.score, null); assert.equal(result.eligible, false);
+    assert.doesNotMatch(result.next, /save this launch/i);
+  }
+});
+test("depleted reserves and graduated curve records cannot enter discovery", () => {
+  assert.equal(assessLaunch({ ...viable, currentEvidence: { ...viable.currentEvidence, reserveSharePercent: 99.97 } }, true, now).signal, "inactive");
+  assert.equal(assessLaunch({ ...viable, currentEvidence: { ...viable.currentEvidence, reserveSharePercent: 99.97 } }, false, now).signal, "inactive");
+  assert.equal(assessLaunch({ ...viable, phase: "graduated" }, true, now).score, null);
+});
+test("drawdown, selling, inactivity, and missing holder evidence withhold scores", () => {
+  for (const changes of [{ peakDrawdownPercent: 90 }, { netQuoteFlow: -10, recentSells: 35, recentBuys: 5 },
+    { lastTradeAt: new Date(now - 3600_000).toISOString() }, { currentEvidence: null }, { previousTrades: 0 }]) {
+    assert.equal(assessLaunch({ ...viable, ...changes }, true, now).eligible, false);
+  }
+});
+test("verified returning participation re-enters without lifetime or graduation bonuses", () => {
+  const reading = assessLaunch(viable, true, now);
+  assert.equal(reading.eligible, true); assert.equal(reading.signal, "surging"); assert.ok(reading.score > 0 && reading.score < 100);
+  assert.equal(assessLaunch({ ...viable, trades: 1e9, deployerGraduations: 1e9 }, true, now).score, reading.score);
+});
+test("fresh collector timestamps cannot disguise an old chain cursor", () => {
+  const state = { mode: "live", generatedAt: new Date(now).toISOString(), collector: { status: "succeeded" },
+    integrity: { pulseReconciled: true }, index: { consecutiveFailures: 0, liveLagBlocks: 3_104_761, lastSuccessAt: new Date(now).toISOString() } };
+  assert.equal(currentPonsEvidence(state, now), false);
+  assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now), true);
+  assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now + 180_000), false);
+});
+test("RPC transport negotiates unsupported batches without changing request IDs", async () => {
+  const original = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++; const request = JSON.parse(init.body);
+    return Response.json(Array.isArray(request) ? { error: { code: -32600, message: "Batch requests are not supported" } } : { id: request.id, result: "0x1" });
+  };
+  try {
+    const result = await rpcEnvelopes("https://rpc.example.test", [1, 2].map((id) => ({ jsonrpc: "2.0", id, method: "eth_blockNumber", params: [] })));
+    assert.deepEqual(result.map((r) => r.id), [1, 2]); assert.equal(calls, 3);
+  } finally { globalThis.fetch = original; }
+});
 
 function word(value) {
   return value.replace(/^0x/, "").padStart(64, "0");
@@ -141,7 +193,7 @@ test("keeps PONS collection inside the worker runtime while prioritizing the liv
   const severeCatchup = ponsCollectionBudget(250_000);
   const balanced = ponsCollectionBudget(10_000);
   assert.deepEqual(catchup, { strategy: "live-catchup", liveBlocks: 1_500, backfillBlocks: 0, metadataLimit: 2 });
-  assert.deepEqual(severeCatchup, { strategy: "live-catchup", liveBlocks: 2_000, backfillBlocks: 0, metadataLimit: 0 });
+  assert.deepEqual(severeCatchup, { strategy: "live-catchup", liveBlocks: 2_000, backfillBlocks: 0, metadataLimit: 2 });
   assert.deepEqual(balanced, { strategy: "balanced", liveBlocks: 1_000, backfillBlocks: 1_000, metadataLimit: 5 });
   assert.ok(catchup.liveBlocks + catchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
   assert.ok(severeCatchup.liveBlocks + severeCatchup.backfillBlocks <= PONS_MAX_BLOCKS_PER_RUN);
@@ -156,7 +208,7 @@ test("retries provider pressure while failing closed on semantic RPC errors", as
   assert.equal(isRetryablePonsRpcError(new Error("pons_chain_mismatch")), false);
 
   const rpc = await readFile(new URL("../lib/ingestion/pons-rpc.ts", import.meta.url), "utf8");
-  assert.match(rpc, /retry-after/);
+  assert.match(await readFile(new URL("../lib/ingestion/rpc-transport.ts", import.meta.url), "utf8"), /retry-after/);
   assert.match(rpc, /providerHealth/);
   assert.match(rpc, /PROVIDER_OPERATION_BUDGET_MS/);
   assert.match(rpc, /getPonsLogsAdaptive/);
@@ -175,13 +227,14 @@ test("materializes one durable state artifact and exposes multi-horizon memory",
   for (const horizon of ["8m", "1h", "6h", "24h", "7d"]) assert.match(ledger, new RegExp(`id: "${horizon}"`));
   assert.match(ledger, /cachePonsState/);
   assert.match(ledger, /loadCachedPonsState/);
-  assert.match(indexer, /recordPonsActivitySnapshot\(head\.number, materializedState\)/);
-  assert.match(indexer, /cachePonsState\(materializedState\)/);
-  assert.match(indexer, /MATERIALIZATION_START_DEADLINE_MS/);
-  assert.match(indexer, /PONS state materialization deferred/);
+  assert.match(indexer, /recordPonsActivitySnapshot\(state.index.latestSeenBlock, state\)/);
+  assert.match(indexer, /cachePonsState\(state\)/);
+  assert.match(indexer, /acquireAuxJob\("materialize"/);
+  assert.match(indexer, /progress.latest_safe_block !== state.index.latestIndexedBlock/);
   assert.match(ledger, /WITH trade_metrics AS MATERIALIZED/);
   assert.match(historyLedger, /WITH recent_launches AS MATERIALIZED/);
-  assert.ok(indexer.indexOf("completeCollectionRun(run.id") < indexer.indexOf("const materializedState = await getPonsState()"));
+  assert.ok(indexer.indexOf("completeCollectionRun(run.id") < indexer.indexOf("export async function materializePonsState"));
+  assert.doesNotMatch(indexer, /await pendingPonsMetadata|await readPonsTokenMetadata/);
   assert.match(model, /PonsMemoryHorizon/);
   assert.match(interfaceSource, /State Memory/);
   assert.match(interfaceSource, /market merely loud/);
@@ -189,13 +242,14 @@ test("materializes one durable state artifact and exposes multi-horizon memory",
 });
 
 test("keeps PONS generations explicit and excludes shallow coverage from rankings", async () => {
-  const [constants, ledger, historyLedger, historyIndexer, model, interfaceSource] = await Promise.all([
+  const [constants, ledger, historyLedger, historyIndexer, model, interfaceSource, coverageSource] = await Promise.all([
     readFile(new URL("../lib/pons/constants.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/pons-ledger.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/pons-history-ledger.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/ingestion/pons-history.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/pons/model.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/pons-observatory.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/protocol-coverage.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(constants, /PONS_V1_CURRENT_FACTORY/);
   assert.match(constants, /PONS_V1_LEGACY_FACTORY/);
@@ -208,9 +262,9 @@ test("keeps PONS generations explicit and excludes shallow coverage from ranking
   assert.match(historyLedger, /pons_generation_index_state/);
   assert.match(historyIndexer, /LAUNCH_DISCOVERY_BLOCKS = 20_000/);
   assert.match(historyIndexer, /SWAP_RECONSTRUCTION_BLOCKS = 4_000/);
-  assert.match(interfaceSource, /Protocol coverage map/);
-  assert.match(interfaceSource, /Complete PONS history/);
-  assert.match(interfaceSource, /excluded from ranks/);
+  assert.match(coverageSource, /Protocol coverage/);
+  assert.match(interfaceSource, /TabsContent value="history"/);
+  assert.match(coverageSource, /Outside rankings/);
 });
 
 test("classifies short-horizon PONS activity without inventing growth from a zero baseline", () => {

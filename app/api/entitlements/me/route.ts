@@ -1,8 +1,16 @@
 import { env } from "cloudflare:workers";
 
-import { chatGPTSignInPath, getChatGPTUser } from "@/app/chatgpt-auth";
+import { chatGPTSignInPath } from "@/app/chatgpt-auth";
+import {
+  authErrorResponse,
+  AuthRequestError,
+  authProviderFromBindings,
+} from "@/lib/auth/config";
+import { authenticateMember } from "@/lib/auth/server";
+import { readEntitlementProfile } from "@/lib/entitlements/server";
 import { evaluatePremiumAccess } from "@/lib/entitlements/token-gate";
-import { ensureMemberProfile, readEntitlementProfile } from "@/lib/entitlements/server";
+
+const PUBLIC_GUARANTEES = ["canonical events", "methodology", "integrity", "rankings"];
 
 type WalletRow = {
   wallet_address: string;
@@ -11,27 +19,59 @@ type WalletRow = {
   verified_at: number;
 };
 
-export async function GET() {
-  const user = await getChatGPTUser();
+export async function GET(request: Request) {
+  const bindings = env as unknown as Record<string, unknown>;
+  let authProvider: ReturnType<typeof authProviderFromBindings>;
+  try {
+    authProvider = authProviderFromBindings(bindings);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticateMember({
+      request,
+      db: env.DB,
+      bindings,
+      forceIdentitySync: new URL(request.url).searchParams.get("sync") === "1",
+    });
+  } catch (error) {
+    if (error instanceof AuthRequestError) {
+      return Response.json({
+        authenticated: false,
+        authProvider,
+        signInPath: authProvider === "chatgpt"
+          ? chatGPTSignInPath("/?view=network#passport")
+          : null,
+        error: error.code,
+        publicGuarantees: PUBLIC_GUARANTEES,
+      }, { status: error.status, headers: { "cache-control": "no-store" } });
+    }
+    return authErrorResponse(error);
+  }
+
   if (!user) {
     return Response.json({
       authenticated: false,
-      signInPath: chatGPTSignInPath("/?view=network#passport"),
-      publicGuarantees: ["canonical events", "methodology", "integrity", "rankings"],
-    }, { status: 401, headers: { "cache-control": "no-store" } });
+      authProvider,
+      signInPath: authProvider === "chatgpt"
+        ? chatGPTSignInPath("/?view=network#passport")
+        : null,
+      publicGuarantees: PUBLIC_GUARANTEES,
+    }, { headers: { "cache-control": "no-store" } });
   }
 
-  await ensureMemberProfile(env.DB, user);
   const walletResult = await env.DB.prepare(`
     SELECT wallet_address, chain_id, is_primary, verified_at
     FROM linked_wallets
     WHERE user_id = ?
-    ORDER BY is_primary DESC, verified_at DESC
+    ORDER BY is_primary DESC, verified_at ASC
   `).bind(user.id).all<WalletRow>();
   const gate = await evaluatePremiumAccess({
     db: env.DB,
     userId: user.id,
-    bindings: env as unknown as Record<string, unknown>,
+    bindings,
   });
   const [profile, watchRow] = await Promise.all([
     readEntitlementProfile(env.DB, user.id),
@@ -45,6 +85,7 @@ export async function GET() {
 
   return Response.json({
     authenticated: true,
+    authProvider: user.provider,
     account: {
       displayName: user.displayName,
       email: user.email,
@@ -58,6 +99,6 @@ export async function GET() {
     entitlements: profile,
     tokenAdapter: gate.adapter,
     premiumAccess: gate.access,
-    publicGuarantees: ["canonical events", "methodology", "integrity", "rankings"],
-  }, { headers: { "cache-control": "no-store" } });
+    publicGuarantees: PUBLIC_GUARANTEES,
+  }, { headers: { "cache-control": "private, no-store" } });
 }

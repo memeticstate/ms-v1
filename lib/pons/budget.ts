@@ -10,7 +10,7 @@ export function ponsCollectionBudget(lagBlocks: number) {
       strategy: "live-catchup" as const,
       liveBlocks: 2_000,
       backfillBlocks: 0,
-      metadataLimit: 0,
+      metadataLimit: 2,
     };
   }
 

@@ -10,8 +10,8 @@ The former curved-path / squiggle / Porous State mark is retired in every palett
 - `public/logo-lockup.svg`: current vector wordmark lockup.
 - `public/favicon.svg`: current app icon.
 - `components/state-glyph.tsx`: current theme-aware UI component.
-- `public/brand/x-avatar.svg`: current compass vector artwork.
-- `public/brand/x-header.svg`: current compass vector lockup.
+- `public/brand/x-avatar.png`: current compass raster artwork.
+- `public/brand/x-header.png`: current compass raster lockup.
 
 The saved brand references are named `Memetic-State-Current-Compass-Logo.png`, `Memetic-State-Current-Compass-Lockup.png`, and `Memetic-State-Current-Compass-Brand-Kit.png`.
 

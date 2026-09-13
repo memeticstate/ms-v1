@@ -14,7 +14,7 @@ const vite = await createServer({
   configFile: false,
   root,
   resolve: { alias: { "@": root } },
-  server: { middlewareMode: true },
+  server: { middlewareMode: true, hmr: false },
 });
 
 after(async () => {
@@ -63,9 +63,9 @@ test("token holder access stays disabled until configured and uses exact supply 
   const ready = tokenAdapterStatus(readyBindings);
   assert.equal(ready.state, "ready");
   assert.equal(ready.grantingEnabled, true);
-  assert.equal(ready.thresholdBps, 5);
-  assert.equal(qualifiesForPremium(500n, 1_000_000n), true);
-  assert.equal(qualifiesForPremium(499n, 1_000_000n), false);
+  assert.equal(ready.thresholdBps, 10);
+  assert.equal(qualifiesForPremium(1000n, 1_000_000n), true);
+  assert.equal(qualifiesForPremium(999n, 1_000_000n), false);
   assert.equal(qualifiesForPremium(123456789012345678901234567890n, 123456789012345678901234567890n), true);
 
   const result = await readTokenGateOnchain({
@@ -73,17 +73,22 @@ test("token holder access stays disabled until configured and uses exact supply 
     bindings: readyBindings,
     fetcher: async (_url, init) => {
       const requests = JSON.parse(init.body);
-      assert.equal(requests.length, 4);
-      return new Response(JSON.stringify([
+      if (requests[0].method === "eth_chainId") return Response.json([
         { jsonrpc: "2.0", id: 1, result: "0x1237" },
         { jsonrpc: "2.0", id: 2, result: "0x100" },
-        { jsonrpc: "2.0", id: 3, result: "0xf4240" },
-        { jsonrpc: "2.0", id: 4, result: "0x1f4" },
-      ]), { status: 200, headers: { "content-type": "application/json" } });
+      ]);
+      assert.equal(requests.length, 4);
+      for (const call of requests.filter((row) => row.method === "eth_call")) assert.equal(call.params[1], "0xfe");
+      return Response.json([
+        { jsonrpc: "2.0", id: 1, result: "0xf4240" },
+        { jsonrpc: "2.0", id: 2, result: "0x3e8" },
+        { jsonrpc: "2.0", id: 3, result: "0x12" },
+        { jsonrpc: "2.0", id: 4, result: { hash: "0x" + "a".repeat(64), number: "0xfe" } },
+      ]);
     },
   });
   assert.equal(result.eligible, true);
-  assert.equal(result.balanceRaw, "500");
+  assert.equal(result.balanceRaw, "1000");
   assert.equal(result.totalSupplyRaw, "1000000");
   assert.equal(result.providerCount, 4);
 });
@@ -109,6 +114,7 @@ test("wallet proof binds account, chain, origin and expiry without a transaction
 test("entitlement storage is migrated and public evidence routes stay outside the gate", async () => {
   const migration = await readFile(path.join(root, "drizzle/0010_purple_magneto.sql"), "utf8");
   const gateMigration = await readFile(path.join(root, "drizzle/0011_token_gate_checks.sql"), "utf8");
+  const identityMigration = await readFile(path.join(root, "drizzle/0012_privy_identity_graph.sql"), "utf8");
   const publicRoute = await readFile(path.join(root, "app/api/pons-state/route.ts"), "utf8");
   const accountRoute = await readFile(path.join(root, "app/api/entitlements/me/route.ts"), "utf8");
   assert.match(migration, /CREATE TABLE `entitlement_grants`/);
@@ -118,8 +124,11 @@ test("entitlement storage is migrated and public evidence routes stay outside th
   assert.match(gateMigration, /CREATE TABLE `token_gate_checks`/);
   assert.match(gateMigration, /token_gate_checks_wallet_contract_idx/);
   assert.match(gateMigration, /token_gate_checks_expiry_idx/);
+  assert.match(identityMigration, /CREATE TABLE `member_identities`/);
+  assert.match(identityMigration, /ALTER TABLE `linked_wallets` ADD `source`/);
+  assert.doesNotMatch(identityMigration, /CREATE TABLE `token_gate_checks`/);
   assert.doesNotMatch(publicRoute, /getChatGPTUser|requireChatGPTUser|entitlement/);
-  assert.match(accountRoute, /getChatGPTUser/);
+  assert.match(accountRoute, /authenticateMember/);
   assert.match(accountRoute, /cache-control.*no-store/s);
 });
 
@@ -131,8 +140,9 @@ test("premium interpretation is server-gated and state mutations require same-or
     readFile(path.join(root, "app/api/research-partner/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/watchtower/watches/route.ts"), "utf8"),
   ]);
-  assert.match(premiumRoute, /getChatGPTUser/);
-  assert.match(premiumRoute, /premium_access_required/);
+  assert.match(premiumRoute, /authenticateMember/);
+  assert.match(premiumRoute, /forceIdentitySync: true/);
+  assert.match(premiumRoute, /premiumResponse/);
   assert.match(premiumRoute, /derivePremiumInterpretation/);
   assert.match(refreshRoute, /rejectCrossSiteMutation/);
   assert.match(refreshRoute, /recentCheck/);
@@ -140,6 +150,57 @@ test("premium interpretation is server-gated and state mutations require same-or
   assert.match(security, /same_origin_required/);
   assert.match(partnerRoute, /rejectCrossSiteMutation/);
   assert.match(watchRoute, /rejectCrossSiteMutation/);
+});
+
+test("Privy rollout is explicit, fail-closed, and keeps bearer tokens out of persistence", async () => {
+  const {
+    AuthRequestError,
+    authProviderFromBindings,
+    extractBearerToken,
+    privyServerConfig,
+  } = await vite.ssrLoadModule("/lib/auth/config.ts");
+  assert.equal(authProviderFromBindings({}), "chatgpt");
+  assert.equal(authProviderFromBindings({ MEMETIC_AUTH_MODE: "privy" }), "privy");
+  assert.throws(
+    () => authProviderFromBindings({ MEMETIC_AUTH_MODE: "anything-else" }),
+    (error) => error instanceof AuthRequestError && error.code === "auth_mode_invalid" && error.status === 503,
+  );
+  assert.throws(
+    () => privyServerConfig({ PRIVY_APP_ID: "public-app-id" }),
+    (error) => error instanceof AuthRequestError && error.code === "privy_configuration_required",
+  );
+  const config = privyServerConfig({ PRIVY_APP_ID: "public-app-id", PRIVY_APP_SECRET: "server-only" });
+  assert.deepEqual(config, { appId: "public-app-id", appSecret: "server-only", jwtVerificationKey: undefined });
+  assert.equal(extractBearerToken(new Request("https://memeticstate.com", {
+    headers: { authorization: "Bearer header.payload.signature" },
+  })), "header.payload.signature");
+  assert.throws(
+    () => extractBearerToken(new Request("https://memeticstate.com", { headers: { authorization: "Basic unsafe" } })),
+    (error) => error instanceof AuthRequestError && error.code === "invalid_access_token",
+  );
+
+  const serverAuth = await readFile(path.join(root, "lib/auth/server.ts"), "utf8");
+  const schema = await readFile(path.join(root, "db/schema.ts"), "utf8");
+  assert.match(serverAuth, /verifyAccessToken/);
+  assert.match(serverAuth, /client\.users\(\)\._get/);
+  assert.doesNotMatch(schema, /access_token|refresh_token|app_secret/);
+});
+
+test("Privy wallet-first UX and private operator ledger are wired without gating public research", async () => {
+  const [provider, passport, adminRoute] = await Promise.all([
+    readFile(path.join(root, "components/memetic-auth-provider.tsx"), "utf8"),
+    readFile(path.join(root, "components/research-passport.tsx"), "utf8"),
+    readFile(path.join(root, "app/api/admin/members/route.ts"), "utf8"),
+  ]);
+  assert.match(provider, /PrivyProvider/);
+  assert.match(provider, /showWalletLoginFirst: true/);
+  assert.match(provider, /"robinhood_wallet"/);
+  assert.match(provider, /createOnLogin: "off"/);
+  assert.match(provider, /Authorization|authorization/);
+  assert.match(passport, /Open with wallet or email/);
+  assert.match(passport, /secured by Privy/);
+  assert.match(adminRoute, /memberIsAdmin/);
+  assert.match(adminRoute, /MEMETIC_ADMIN_IDENTITIES|admin_access_required/);
 });
 
 test("public network copy keeps operator launch planning out of the observatory", async () => {

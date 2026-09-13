@@ -1,6 +1,7 @@
 import { runAffinityCollection } from "@/lib/ingestion/pair-live";
 import { runPonsHistoryCollection } from "@/lib/ingestion/pons-history";
 import { runPonsCollection } from "@/lib/ingestion/pons-live";
+import { runFactoryCollection } from "@/lib/ingestion/pons-factory";
 import type { PonsV1GenerationId } from "@/lib/pons/constants";
 import type { CollectionTrigger } from "@/db/engine-ledger";
 
@@ -19,9 +20,10 @@ async function capture<T>(label: string, operation: () => Promise<T>) {
 
 export async function runPrimaryCollectorCycle(
   trigger: CollectionTrigger,
-  options: { force?: boolean; includeEvidence?: boolean } = {},
+  options: { force?: boolean; includeEvidence?: boolean; includeFactory?: boolean } = {},
 ) {
   const results: Array<Awaited<ReturnType<typeof capture>>> = [];
+  if (options.includeFactory ?? true) results.push(await capture("pons-factory-live", runFactoryCollection));
   // Sequential lanes avoid making the same public RPC providers rate-limit each other.
   if (options.includeEvidence ?? true) {
     results.push(await capture("robinhood-evidence", () => runAffinityCollection(trigger, { force: options.force })));
@@ -39,13 +41,14 @@ export async function runHistoryCollectorCycle(
 }
 
 export async function runScheduledCollectorCycle(scheduledTime: number) {
+  const factory = await capture("pons-factory-live", runFactoryCollection);
   const minuteSlot = Math.floor(scheduledTime / 60_000) % 5;
   // Give each expensive lane its own Worker invocation budget. This prevents a
   // slow evidence refresh from canceling the live PONS commit that follows it.
   if (minuteSlot === 0) {
-    return [await capture("robinhood-evidence", () => runAffinityCollection("scheduled"))];
+    return [factory, await capture("robinhood-evidence", () => runAffinityCollection("scheduled"))];
   }
-  if (minuteSlot === 2) return [await runHistoryCollectorCycle("scheduled", "v1-current")];
-  if (minuteSlot === 4) return [await runHistoryCollectorCycle("scheduled", "v1-legacy")];
-  return runPrimaryCollectorCycle("scheduled", { includeEvidence: false });
+  if (minuteSlot === 2) return [factory, await runHistoryCollectorCycle("scheduled", "v1-current")];
+  if (minuteSlot === 4) return [factory, await runHistoryCollectorCycle("scheduled", "v1-legacy")];
+  return [factory, ...await runPrimaryCollectorCycle("scheduled", { includeEvidence: false, includeFactory: false })];
 }

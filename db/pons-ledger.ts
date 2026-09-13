@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { prepareInsertRows } from "@/db/insert-rows";
 import {
   PONS_FINALITY_BLOCKS,
   PONS_PAIR_BY_ADDRESS,
@@ -40,7 +41,7 @@ import {
 
 const INDEX_ID = "pons-v2";
 const LEASE_MS = 55 * 1000;
-const MIN_INTERVAL_MS = 35 * 1000;
+const MIN_INTERVAL_MS = 10 * 1000;
 const MEMORY_HORIZONS = [
   { id: "8m", label: "8 minutes", minutes: 8, toleranceMinutes: 20 },
   { id: "1h", label: "1 hour", minutes: 60, toleranceMinutes: 120 },
@@ -79,7 +80,6 @@ async function ensureIndexState() {
 }
 
 export async function loadPonsIndexState() {
-  await ensureIndexState();
   return getD1().prepare(`SELECT locked_until, initialized_at, live_next_block, backfill_next_block,
       latest_safe_block, latest_safe_hash, latest_seen_block, last_attempt_at, last_success_at,
       last_failure_at, last_error_code, consecutive_failures, last_record_count
@@ -113,21 +113,22 @@ export async function initializePonsIndex(headBlock: number, bootstrapBlocks = 1
 
 export async function rewindPonsIndex(fromBlock: number) {
   const db = getD1();
+  const throughBlock = (await loadPonsIndexState())?.latest_safe_block ?? fromBlock;
   await db.batch([
-    db.prepare("DELETE FROM pons_curve_trades WHERE block_number >= ?").bind(fromBlock),
-    db.prepare("DELETE FROM pons_events WHERE block_number >= ?").bind(fromBlock),
-    db.prepare("DELETE FROM pons_launches WHERE block_number >= ?").bind(fromBlock),
+    db.prepare("DELETE FROM pons_curve_trades WHERE block_number BETWEEN ? AND ?").bind(fromBlock, throughBlock),
+    db.prepare("DELETE FROM pons_events WHERE block_number BETWEEN ? AND ?").bind(fromBlock, throughBlock),
+    db.prepare("DELETE FROM pons_launches WHERE block_number BETWEEN ? AND ?").bind(fromBlock, throughBlock),
     db.prepare(`UPDATE pons_index_state SET live_next_block = ?, latest_safe_block = ?,
       latest_safe_hash = NULL WHERE id = ?`).bind(fromBlock, Math.max(0, fromBlock - 1), INDEX_ID),
   ]);
 }
 
-export async function clearPonsStagedRange(fromBlock: number) {
+export async function clearPonsStagedRange(fromBlock: number, toBlock: number) {
   const db = getD1();
   await db.batch([
-    db.prepare("DELETE FROM pons_curve_trades WHERE block_number >= ?").bind(fromBlock),
-    db.prepare("DELETE FROM pons_events WHERE block_number >= ?").bind(fromBlock),
-    db.prepare("DELETE FROM pons_launches WHERE block_number >= ?").bind(fromBlock),
+    db.prepare("DELETE FROM pons_curve_trades WHERE block_number BETWEEN ? AND ?").bind(fromBlock, toBlock),
+    db.prepare("DELETE FROM pons_events WHERE block_number BETWEEN ? AND ?").bind(fromBlock, toBlock),
+    db.prepare("DELETE FROM pons_launches WHERE block_number BETWEEN ? AND ?").bind(fromBlock, toBlock),
   ]);
 }
 
@@ -177,22 +178,19 @@ export async function persistPonsLogs(input: {
   const freshCurves = new Map(launches.map(({ decoded }) => [decoded.curveAddress, decoded.tokenAddress]));
   const existingCurves = await curveMap(input.curveLogs.map((log) => log.address));
   const curves = new Map([...existingCurves, ...freshCurves]);
-  const statements: D1PreparedStatement[] = [];
+  const launchRows: Array<Array<string | number | null>> = [];
+  const eventRows: Array<Array<string | number | null>> = [];
+  const tradeRows: Array<Array<string | number | null>> = [];
 
   for (const { log, decoded } of launches) {
     const pair = registry.get(decoded.pairTokenAddress)
       ?? { symbol: `PAIR-${decoded.pairTokenAddress.slice(2, 6).toUpperCase()}`, decimals: 18 };
-    statements.push(getD1().prepare(`INSERT OR IGNORE INTO pons_launches
-      (token_address, curve_address, deployer_address, pair_token_address, pair_symbol, pair_decimals,
-       launch_config_id, graduation_threshold_raw, block_number, block_hash, block_timestamp,
-       tx_hash, log_index, metadata_status, observed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`)
-      .bind(
+    launchRows.push([
         decoded.tokenAddress, decoded.curveAddress, decoded.deployerAddress, decoded.pairTokenAddress,
         pair.symbol, pair.decimals, decoded.launchConfigId, decoded.graduationThresholdRaw,
         hexInt(log.blockNumber), log.blockHash.toLowerCase(), rpcLogTimestamp(log, input.fallbackTimestamp),
-        log.transactionHash.toLowerCase(), hexInt(log.logIndex), observedAt,
-      ));
+        log.transactionHash.toLowerCase(), hexInt(log.logIndex), "pending", observedAt,
+      ]);
   }
 
   let lifecycleEvents = 0;
@@ -200,15 +198,11 @@ export async function persistPonsLogs(input: {
     const decoded = decodeFactoryLog(log);
     if (!decoded) continue;
     lifecycleEvents += 1;
-    statements.push(getD1().prepare(`INSERT OR IGNORE INTO pons_events
-      (id, event_type, token_address, emitter_address, block_number, block_hash, block_timestamp,
-       tx_hash, log_index, data_json, observed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(
+    eventRows.push([
         eventId(log), decoded.type, decoded.tokenAddress, log.address.toLowerCase(), hexInt(log.blockNumber),
         log.blockHash.toLowerCase(), rpcLogTimestamp(log, input.fallbackTimestamp), log.transactionHash.toLowerCase(),
         hexInt(log.logIndex), JSON.stringify(decoded), observedAt,
-      ));
+      ]);
   }
 
   let trades = 0;
@@ -218,35 +212,42 @@ export async function persistPonsLogs(input: {
     const tokenAddress = curves.get(decoded.curveAddress);
     if (!tokenAddress) continue;
     trades += 1;
-    statements.push(getD1().prepare(`INSERT OR IGNORE INTO pons_curve_trades
-      (id, curve_address, token_address, side, actor_address, recipient_address, quote_amount_raw,
-       token_amount_raw, fee_raw, tax_raw, block_number, block_hash, block_timestamp, tx_hash,
-       log_index, observed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(
+    tradeRows.push([
         eventId(log), decoded.curveAddress, tokenAddress, decoded.side, decoded.actorAddress,
         decoded.recipientAddress, decoded.quoteAmountRaw, decoded.tokenAmountRaw, decoded.feeRaw,
         decoded.taxRaw, hexInt(log.blockNumber), log.blockHash.toLowerCase(),
         rpcLogTimestamp(log, input.fallbackTimestamp), log.transactionHash.toLowerCase(),
         hexInt(log.logIndex), observedAt,
-      ));
+      ]);
   }
 
+  // Several rows per statement reduce database round trips without widening the
+  // verified block range or changing replay/idempotency semantics.
+  const db = getD1();
+  const statements = [
+    ...prepareInsertRows(db, "pons_launches", ["token_address", "curve_address", "deployer_address", "pair_token_address", "pair_symbol", "pair_decimals", "launch_config_id", "graduation_threshold_raw", "block_number", "block_hash", "block_timestamp", "tx_hash", "log_index", "metadata_status", "observed_at"], launchRows),
+    ...prepareInsertRows(db, "pons_events", ["id", "event_type", "token_address", "emitter_address", "block_number", "block_hash", "block_timestamp", "tx_hash", "log_index", "data_json", "observed_at"], eventRows),
+    ...prepareInsertRows(db, "pons_curve_trades", ["id", "curve_address", "token_address", "side", "actor_address", "recipient_address", "quote_amount_raw", "token_amount_raw", "fee_raw", "tax_raw", "block_number", "block_hash", "block_timestamp", "tx_hash", "log_index", "observed_at"], tradeRows),
+  ];
   await runBatches(statements);
   return { launches: launches.length, lifecycleEvents, trades, statements: statements.length };
 }
 
 export async function pendingPonsMetadata(limit = 40) {
-  const result = await getD1().prepare(`SELECT l.token_address, COUNT(t.id) AS observed_trades
-    FROM pons_launches l LEFT JOIN pons_curve_trades t ON t.token_address = l.token_address
-    WHERE (l.metadata_status = 'pending'
-       OR (l.metadata_status = 'failed' AND COALESCE(l.metadata_updated_at, 0) < ?))
-      AND l.block_number <= COALESCE((SELECT latest_safe_block FROM pons_index_state WHERE id = ?), 0)
-    GROUP BY l.token_address
-    ORDER BY observed_trades DESC, l.block_number DESC LIMIT ?`)
-    .bind(Date.now() - 6 * 60 * 60 * 1000, INDEX_ID, limit)
-    .all<{ token_address: string }>();
-  return result.results.map((row) => ({ tokenAddress: row.token_address }));
+  const result = await getD1().prepare(`WITH candidates AS MATERIALIZED (
+    SELECT token_address, COUNT(*) AS trades FROM (
+      SELECT token_address FROM pons_curve_trades ORDER BY block_number DESC LIMIT 10000
+    ) GROUP BY token_address
+  ) SELECT l.token_address FROM pons_launches l
+    JOIN candidates c ON c.token_address = l.token_address
+    WHERE l.metadata_status = 'pending' OR (l.metadata_status = 'failed' AND COALESCE(l.metadata_updated_at, 0) < ?)
+    ORDER BY c.trades DESC LIMIT ?`)
+    .bind(Date.now() - 10 * 60_000, limit).all<{ token_address: string }>();
+  const recent = await getD1().prepare(`SELECT token_address FROM pons_launches
+    WHERE metadata_status = 'pending' ORDER BY block_number DESC LIMIT ?`).bind(limit).all<{ token_address: string }>();
+  // Resolve new factory identities alongside the active historical trade sample.
+  return [...new Set([...recent.results.slice(0, Math.ceil(limit / 2)), ...result.results, ...recent.results]
+    .map((row) => row.token_address))].slice(0, limit).map((tokenAddress) => ({ tokenAddress }));
 }
 
 export async function updatePonsMetadata(records: Array<{
@@ -416,6 +417,12 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
         ORDER BY recent_trades DESC, trades DESC, unique_traders DESC, l.block_number DESC LIMIT 120
       )
       SELECT r.*,
+        (SELECT COUNT(DISTINCT t.actor_address) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.block_number BETWEEN ${previousFromBlock} AND ${previousToBlock}) AS previous_actors,
+        (SELECT MAX(t.block_timestamp) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.block_number <= ${latestIndexedBlock}) AS last_trade_at,
+        (SELECT SUM(CASE WHEN t.side = 'buy' THEN CAST(t.quote_amount_raw AS REAL) ELSE -CAST(t.quote_amount_raw AS REAL) END) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.block_number BETWEEN ${recentFromBlock} AND ${latestIndexedBlock}) AS net_quote_flow,
+        (SELECT COUNT(*) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.actor_address = r.deployer_address AND t.side = 'sell' AND t.block_number BETWEEN ${fromBlock} AND ${latestIndexedBlock}) AS creator_sells,
+        (SELECT MAX(CAST(t.quote_amount_raw AS REAL) / NULLIF(CAST(t.token_amount_raw AS REAL), 0)) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.block_number BETWEEN ${fromBlock} AND ${latestIndexedBlock}) AS peak_execution,
+        (SELECT CAST(t.quote_amount_raw AS REAL) / NULLIF(CAST(t.token_amount_raw AS REAL), 0) FROM pons_curve_trades t WHERE t.token_address = r.token_address AND t.block_number <= ${latestIndexedBlock} ORDER BY t.block_number DESC, t.log_index DESC LIMIT 1) AS last_execution,
         CASE WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = r.token_address AND e.event_type = 'graduation' AND e.block_number <= ?) THEN 'graduated'
              WHEN EXISTS(SELECT 1 FROM pons_events e WHERE e.token_address = r.token_address AND e.event_type = 'sweep' AND e.block_number <= ?) THEN 'swept'
              ELSE 'bonding' END AS phase,
@@ -436,6 +443,8 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
         trades: number; unique_traders: number; buys: number; sells: number; phase: "bonding" | "graduated" | "swept";
         recent_trades: number; previous_trades: number; recent_unique_traders: number;
         recent_buys: number; recent_sells: number;
+        previous_actors: number; last_trade_at: number | null; net_quote_flow: number | null;
+        creator_sells: number; peak_execution: number | null; last_execution: number | null;
         deployer_launches: number; deployer_graduations: number;
       }>(),
     db.prepare(`SELECT e.id, e.event_type, e.token_address, e.block_number, e.block_timestamp,
@@ -580,15 +589,6 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
     const recentSells = Number(row.recent_sells);
     const momentumPercent = ponsMomentumPercent(recentTrades, previousTrades);
     const signal = classifyPonsSignal({ recent: recentTrades, previous: previousTrades, recentActors: recentUniqueTraders });
-    const recency = latestIndexedBlock > 0 ? clamp(12 - (latestIndexedBlock - row.block_number) / 7_000, 0, 12) : 0;
-    const momentumBoost = momentumPercent === null
-      ? (recentTrades > 0 ? 8 : 0)
-      : clamp(momentumPercent / 8, -10, 12);
-    const attentionScore = clamp(
-      6 + Math.log2(trades + 1) * 6 + Math.sqrt(uniqueTraders) * 4
-      + Math.log2(recentTrades + 1) * 11 + Math.sqrt(recentUniqueTraders) * 5
-      + (row.phase === "graduated" ? 12 : row.phase === "swept" ? 7 : 0) + recency + momentumBoost,
-    );
     return {
       tokenAddress: row.token_address,
       curveAddress: row.curve_address,
@@ -596,8 +596,8 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
       pairTokenAddress: row.pair_token_address,
       pairSymbol: row.pair_symbol,
       pairColor: presentation.color,
-      name: row.token_name ?? `Launch ${shortAddress(row.token_address)}`,
-      symbol: row.token_symbol ?? shortAddress(row.token_address).toUpperCase(),
+      name: row.token_name ?? "Name unresolved",
+      symbol: row.token_symbol ?? "—",
       blockNumber: row.block_number,
       launchedAt: isoSeconds(row.block_timestamp),
       txHash: row.tx_hash,
@@ -611,6 +611,11 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
       recentTrades,
       previousTrades,
       recentUniqueTraders,
+      previousUniqueTraders: Number(row.previous_actors),
+      lastTradeAt: row.last_trade_at ? isoSeconds(row.last_trade_at) : null,
+      netQuoteFlow: row.net_quote_flow,
+      creatorSellEvents: Number(row.creator_sells),
+      peakDrawdownPercent: row.peak_execution && row.last_execution !== null ? Math.max(0, (1 - row.last_execution / row.peak_execution) * 100) : null,
       recentBuys,
       recentSells,
       momentumPercent,
@@ -619,7 +624,7 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
       signalNote: ponsSignalNote({ signal, recent: recentTrades, previous: previousTrades, recentActors: recentUniqueTraders }),
       confidence: ponsSignalConfidence(recentTrades, recentUniqueTraders),
       flowQuality: trades ? Math.round(clamp(uniqueTraders / trades * 180)) : 0,
-      attentionScore: Math.round(attentionScore),
+      attentionScore: 0,
       deployerLaunches: Number(row.deployer_launches),
       deployerGraduations: Number(row.deployer_graduations),
     };
@@ -741,7 +746,7 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
   const metadataResolved = Number(coverageRow?.resolved ?? 0);
   const memoryRows = await Promise.all(MEMORY_HORIZONS.map((horizon) => db.prepare(`SELECT observed_at,
       launch_count, graduation_count, buy_count, sell_count, active_traders, payload_json
-    FROM pons_activity_snapshots WHERE observed_at <= ? ORDER BY observed_at DESC LIMIT 1`)
+    FROM pons_activity_snapshots WHERE observed_at <= ? AND head_block - to_block <= 3000 ORDER BY observed_at DESC LIMIT 1`)
     .bind(Date.now() - horizon.minutes * 60_000)
     .first<{ observed_at: number; launch_count: number; graduation_count: number; buy_count: number;
       sell_count: number; active_traders: number; payload_json: string }>()));
@@ -840,6 +845,7 @@ export async function getPonsState(requestedWindowBlocks = DEFAULT_PONS_STATE_WI
           indexedThroughBlock: latestIndexedBlock || null,
           historicalProgress: Math.round(historicalProgress * 10) / 10,
           rankingEligible: true,
+          launchesIndexed: metadataTotal,
         },
         {
           id: "v1-current",

@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { authErrorResponse } from "@/lib/auth/config";
+import { authenticateMember } from "@/lib/auth/server";
 import { rejectCrossSiteMutation } from "@/lib/entitlements/request-security";
 import { evaluatePremiumAccess } from "@/lib/entitlements/token-gate";
-import { ensureMemberProfile } from "@/lib/entitlements/server";
 
 export async function POST(request: Request) {
   const rejection = rejectCrossSiteMutation(request);
@@ -12,9 +12,14 @@ export async function POST(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > 4_096) {
     return Response.json({ accepted: false, error: "request_too_large" }, { status: 413, headers: { "cache-control": "no-store" } });
   }
-  const user = await getChatGPTUser();
+  const bindings = env as unknown as Record<string, unknown>;
+  let user: Awaited<ReturnType<typeof authenticateMember>>;
+  try {
+    user = await authenticateMember({ request, db: env.DB, bindings, forceIdentitySync: true });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   if (!user) return Response.json({ accepted: false, error: "sign_in_required" }, { status: 401, headers: { "cache-control": "no-store" } });
-  await ensureMemberProfile(env.DB, user);
   try {
     const nowSeconds = Math.floor(Date.now() / 1_000);
     const recentCheck = await env.DB.prepare(`
@@ -25,7 +30,7 @@ export async function POST(request: Request) {
     const gate = await evaluatePremiumAccess({
       db: env.DB,
       userId: user.id,
-      bindings: env as unknown as Record<string, unknown>,
+      bindings,
       force: !recentCheck,
       nowSeconds,
     });

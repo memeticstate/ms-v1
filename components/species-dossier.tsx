@@ -20,9 +20,9 @@ type HistoryPoint = {
 function Metric({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="border-t border-foreground/10 pt-3">
-      <p className="font-mono text-[8px] uppercase tracking-[0.17em] text-foreground/32">{label}</p>
+      <p className="font-mono text-xs uppercase tracking-[0.17em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold tracking-tight text-foreground/90">{value}</p>
-      {note ? <p className="mt-0.5 truncate text-[9px] text-foreground/25">{note}</p> : null}
+      {note ? <p className="mt-0.5 truncate text-caption text-muted-foreground">{note}</p> : null}
     </div>
   );
 }
@@ -30,13 +30,13 @@ function Metric({ label, value, note }: { label: string; value: string; note?: s
 function Trait({ label, value, color, detail }: { label: string; value: number; color: string; detail: string }) {
   return (
     <div title={detail}>
-      <div className="mb-1.5 flex items-center justify-between gap-3 font-mono text-[8px] uppercase tracking-[0.15em] text-foreground/42">
+      <div className="mb-1.5 flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
         <span>{label}</span><span>{value}/100</span>
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-foreground/8">
         <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${value}%`, backgroundColor: color }} />
       </div>
-      <p className="mt-1.5 text-[9px] leading-4 text-foreground/25">{detail}</p>
+      <p className="mt-1.5 text-caption leading-4 text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -115,16 +115,16 @@ export function SpeciesDossier({
     <aside className="flex h-full flex-col rounded-[10px] border border-foreground/10 bg-[var(--surface-3)]/94 p-5 shadow-2xl shadow-black/20 lg:min-h-[760px] lg:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-12 shrink-0 place-items-center rounded-full border bg-[var(--surface-3)] font-mono text-[10px] font-bold"
+          <div className="grid size-12 shrink-0 place-items-center rounded-full border bg-[var(--surface-3)] font-mono text-caption font-bold"
             style={{ borderColor: species.color, color: species.color }}>
             {species.symbol.slice(0, 5)}
           </div>
           <div className="min-w-0">
-            <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-foreground/35">Species dossier · rank {species.rank ?? "—"}</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Species dossier · rank {species.rank ?? "—"}</p>
             <h2 className="mt-1 truncate text-xl font-semibold tracking-tight">{species.name}</h2>
           </div>
         </div>
-        <span className="shrink-0 rounded border border-signal/25 bg-signal/8 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.13em] text-signal">
+        <span className="shrink-0 rounded border border-signal/25 bg-signal/8 px-2 py-1 font-mono text-xs uppercase tracking-[0.13em] text-signal">
           {species.graduated ? "Graduated" : "Emerging"}
         </span>
       </div>
@@ -133,7 +133,7 @@ export function SpeciesDossier({
         style={{ borderColor: species.color }}>
         {species.thesis}
       </blockquote>
-      <p className="mt-3 text-xs leading-5 text-foreground/46">{species.interpretation}</p>
+      <p className="mt-3 text-xs leading-5 text-muted-foreground">{species.interpretation}</p>
 
       <div className="mt-6 grid grid-cols-3 gap-x-4 gap-y-4">
         <Metric label="Market cap" value={compactUsd.format(species.marketCapUsd)} />
@@ -148,16 +148,16 @@ export function SpeciesDossier({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Gauge aria-hidden="true" className="size-3.5 text-signal" />
-            <p className="font-mono text-[8px] uppercase tracking-[0.17em] text-foreground/40">Observed metric model</p>
+            <p className="font-mono text-xs uppercase tracking-[0.17em] text-muted-foreground">Observed metric model</p>
           </div>
-          <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-foreground/25">{metrics.version}</span>
+          <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{metrics.version}</span>
         </div>
         <div className="space-y-4">
           <Trait label="Affinity balance" value={metrics.affinityBalance} color="var(--signal)" detail="Normalized entropy of declared habitat weights." />
           <Trait label="Market vitality" value={metrics.marketVitality} color={species.color} detail="Turnover, trade frequency and available depth." />
           <Trait label="Market stress" value={metrics.marketStress} color="var(--danger)" detail="24h volatility plus depth fragility." />
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-foreground/8 pt-3 font-mono text-[8px] uppercase tracking-[0.13em] text-foreground/25">
+        <div className="mt-4 flex items-center justify-between border-t border-foreground/8 pt-3 font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
           <span>Data completeness</span><span>{metrics.dataCompleteness}/100</span>
         </div>
       </div>
@@ -167,21 +167,21 @@ export function SpeciesDossier({
           <div className="flex items-center gap-2">
             <Activity aria-hidden="true" className="size-3.5 text-attention" />
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-[0.17em] text-foreground/40">Observed trajectory</p>
-              <p className="mt-0.5 text-[9px] text-foreground/24">{history.length || 1} frozen state{(history.length || 1) === 1 ? "" : "s"}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.17em] text-muted-foreground">Observed trajectory</p>
+              <p className="mt-0.5 text-caption text-muted-foreground">{history.length || 1} frozen state{(history.length || 1) === 1 ? "" : "s"}</p>
             </div>
           </div>
-          <Database aria-hidden="true" className="size-3 text-foreground/20" />
+          <Database aria-hidden="true" className="size-3 text-muted-foreground" />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
-            <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-[0.12em] text-foreground/25">
+            <div className="flex items-center justify-between font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
               <span>Market cap</span><span>{compactUsd.format(species.marketCapUsd)}</span>
             </div>
             <Sparkline points={trajectory} field="marketCapUsd" color={species.color} />
           </div>
           <div>
-            <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-[0.12em] text-foreground/25">
+            <div className="flex items-center justify-between font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
               <span>Volume</span><span>{compactUsd.format(species.observedVolumeUsd)}</span>
             </div>
             <Sparkline points={trajectory} field="volume24hUsd" color="var(--attention)" />
@@ -194,11 +194,11 @@ export function SpeciesDossier({
           <div className="flex items-center gap-2">
             <GitBranch aria-hidden="true" className="size-3.5 text-culture" />
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-foreground/35">Declared affinity genome</p>
-              <p className="mt-0.5 text-[9px] text-foreground/25">Registry-linked PAIR composition</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">Declared affinity genome</p>
+              <p className="mt-0.5 text-caption text-muted-foreground">Registry-linked PAIR composition</p>
             </div>
           </div>
-          <p className="text-right font-mono text-[8px] uppercase tracking-[0.12em] text-foreground/24">Not asset backing</p>
+          <p className="text-right font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Not asset backing</p>
         </div>
         <div className="mt-4 space-y-3">
           {species.genome.map((gene) => {
@@ -207,17 +207,17 @@ export function SpeciesDossier({
             return (
               <div key={gene.habitat} className="grid grid-cols-[48px_1fr_44px] items-center gap-3">
                 <div>
-                  <span className="font-mono text-[10px] font-semibold" style={{ color: habitat?.color }}>
+                  <span className="font-mono text-caption font-semibold" style={{ color: habitat?.color }}>
                     {gene.habitat}
                   </span>
                   {Number.isFinite(multiplier) && multiplier !== 1 ? (
-                    <p className="font-mono text-[7px] text-foreground/20">×{multiplier.toFixed(3)}</p>
+                    <p className="font-mono text-xs text-muted-foreground">×{multiplier.toFixed(3)}</p>
                   ) : null}
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-foreground/8">
                   <div className="h-full rounded-full" style={{ width: `${gene.weight}%`, backgroundColor: habitat?.color ?? species.color }} />
                 </div>
-                <span className="text-right font-mono text-[9px] text-foreground/40">{gene.weight}%</span>
+                <span className="text-right font-mono text-caption text-muted-foreground">{gene.weight}%</span>
               </div>
             );
           })}
@@ -225,21 +225,21 @@ export function SpeciesDossier({
       </div>
 
       <div className="mt-6 border-t border-foreground/10 pt-4">
-        <div className="flex items-center justify-between gap-3 font-mono text-[8px] uppercase tracking-[0.12em] text-foreground/30">
+        <div className="flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2">
             <ShieldCheck aria-hidden="true" className="size-3 shrink-0 text-signal" />
             <a
               href={`https://robinhoodchain.blockscout.com/address/${species.contract}`}
               target="_blank"
               rel="noreferrer"
-              className="truncate underline decoration-white/15 underline-offset-4 hover:text-foreground/55"
+              className="truncate underline decoration-white/15 underline-offset-4 hover:text-muted-foreground"
             >
               {species.contract}
             </a>
           </div>
           <span className="shrink-0">{sourceState}</span>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3 text-[9px] text-foreground/24">
+        <div className="mt-2 flex items-center justify-between gap-3 text-caption text-muted-foreground">
           <span>{species.marketDataSource ?? species.sourceLabel}</span>
           <span>{species.launchedAt ? `Launched ${new Date(species.launchedAt).toLocaleDateString("en-GB")}` : species.sourceLabel}</span>
         </div>

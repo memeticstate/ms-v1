@@ -60,6 +60,14 @@ export async function fetchJsonWithPolicy<T>(url: string, policy: FetchPolicy = 
       });
       if (!response.ok) {
         const code = `http_${response.status}`;
+        // Release failed upstream bodies before retrying or throwing. Cloudflare
+        // Workers can cancel a request when an unread response body stalls the
+        // isolate's connection pool.
+        try {
+          await response.body?.cancel();
+        } catch {
+          // Body cleanup is best effort; preserve the upstream status below.
+        }
         if (attempt < maxAttempts && retryableStatus(response.status)) {
           lastError = new UpstreamError(code, `upstream returned ${response.status}`, attempt, response.status);
           await shortDelay(attempt);

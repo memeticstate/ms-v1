@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rpcEnvelopes, type RpcRequest } from "./rpc-transport";
 
 import { getD1, getRuntimeBinding } from "@/db";
 import { recordSourceObservation } from "@/db/engine-ledger";
@@ -106,34 +107,18 @@ function errorCode(error: unknown) {
   return "invalid_response";
 }
 
-async function rpcBatch(provider: Provider, requests: unknown[]) {
+async function rpcBatch(provider: Provider, requests: RpcRequest[]) {
   const startedAt = Date.now();
   let lastError: unknown;
   for (let attempt = 1; attempt <= RPC_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(provider.url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json",
-          "user-agent": "Memetic-State/0.4 (+https://memetic-state.z3c4.chatgpt.site)",
-        },
-        body: JSON.stringify(requests),
-        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        const error = new Error(`http_${response.status}`);
-        if (attempt >= RPC_ATTEMPTS || (response.status !== 429 && response.status < 500)) throw error;
-        lastError = error;
-      } else {
-        const envelopes = rpcEnvelopeSchema.parse(await response.json());
+        const envelopes = rpcEnvelopeSchema.parse(await rpcEnvelopes(provider.url, requests, RPC_TIMEOUT_MS));
         const rpcError = envelopes.find((item) => item.error)?.error;
         if (rpcError) throw new Error(`rpc_${rpcError.code}`);
         return { byId: new Map(envelopes.map((item) => [item.id, item.result])), latencyMs: Date.now() - startedAt };
-      }
     } catch (error) {
       lastError = error;
-      if (attempt >= RPC_ATTEMPTS || (error instanceof Error && /^http_4(?!29)\d{2}$/.test(error.message))) throw error;
+      if (attempt >= RPC_ATTEMPTS || (error instanceof Error && /^http_4\d{2}$/.test(error.message))) throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, 140 * attempt));
   }
@@ -158,13 +143,13 @@ async function readEvidence(
   multiplierInputs: MultiplierInput[],
   blockNumber: number,
 ): Promise<Evidence> {
-  const requests = [
+  const requests: RpcRequest[] = [
     { jsonrpc: "2.0", id: 2, method: "eth_getBlockByNumber", params: [toHex(blockNumber), false] },
-    ...verificationInputs.flatMap((input, index) => [
+    ...verificationInputs.flatMap((input, index): RpcRequest[] => [
       { jsonrpc: "2.0", id: 100 + index, method: "eth_getCode", params: [input.contract, toHex(blockNumber)] },
       { jsonrpc: "2.0", id: 200 + index, method: "eth_getTransactionReceipt", params: [input.launchTxHash] },
     ]),
-    ...multiplierInputs.map((input, index) => ({
+    ...multiplierInputs.map((input, index): RpcRequest => ({
       jsonrpc: "2.0", id: 300 + index, method: "eth_call",
       params: [{ to: input.contract, data: "0xa60bf13d" }, toHex(blockNumber)],
     })),

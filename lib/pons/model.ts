@@ -1,6 +1,6 @@
 export type PonsIndexMode = "live" | "indexing" | "empty" | "degraded";
 
-export type PonsActivitySignal = "surging" | "broadening" | "forming" | "steady" | "cooling" | "quiet";
+export type PonsActivitySignal = "surging" | "broadening" | "forming" | "steady" | "cooling" | "quiet" | "historical" | "unverified" | "inactive" | "stressed";
 export type PonsSignalConfidence = "high" | "medium" | "early";
 
 export type PonsPulseMetric = {
@@ -43,6 +43,7 @@ export type PonsLaunchView = {
   name: string;
   symbol: string;
   blockNumber: number;
+  imageUrl?: string | null;
   launchedAt: string;
   txHash: string;
   launchConfigId: number;
@@ -66,6 +67,47 @@ export type PonsLaunchView = {
   attentionScore: number;
   deployerLaunches: number;
   deployerGraduations: number;
+  lastTradeAt?: string | null;
+  previousUniqueTraders?: number;
+  netQuoteFlow?: number | null;
+  peakDrawdownPercent?: number | null;
+  creatorSellEvents?: number;
+  research?: PonsResearchReading;
+  currentEvidence?: PonsTokenEvidence | null;
+};
+
+export type PonsResearchReading = {
+  eligible: boolean;
+  signal: PonsActivitySignal;
+  label: string;
+  score: number | null;
+  reasons: string[];
+  next: string;
+  observedAt: string | null;
+};
+
+export type PonsTokenEvidence = {
+  sampleBasis?: "explorer" | "indexed-actors";
+  tokenAddress: string;
+  checkedAt: string;
+  observedAt: string | null;
+  blockNumber: number | null;
+  status: "ok" | "partial" | "unavailable";
+  symbol: string | null;
+  name: string | null;
+  totalSupplyRaw: string | null;
+  reserveSharePercent: number | null;
+  deployerSharePercent: number | null;
+  holderCount: number | null;
+  meaningfulHolders: number | null;
+  holderSampleSize: number;
+  holdersComplete: boolean;
+  largestWalletSharePercent: number | null;
+  poolAddress: string | null;
+  twitterUrl: string | null;
+  social: { status: "unconfigured" | "ok" | "unavailable"; mentions: number | null; authors: number | null; latestPostAt: string | null; posts: Array<{ url: string; createdAt: string }> };
+  sources: string[];
+  errors: string[];
 };
 
 export type PonsTapeEvent = {
@@ -177,6 +219,7 @@ export type PonsProtocolHistory = {
 };
 
 export type PonsStateResponse = {
+  collectionProgress?: { indexedBlock: number; headBlock: number; lagBlocks: number; lastSuccessAt: string | null };
   mode: PonsIndexMode;
   generatedAt: string;
   window: {
@@ -229,6 +272,7 @@ export type PonsStateResponse = {
     generations: PonsProtocolGeneration[];
   };
   history?: PonsProtocolHistory;
+  factoryLive?: PonsFactoryFeed | null;
   collector: {
     status: "running" | "succeeded" | "failed" | "idle";
     phase: string;
@@ -282,4 +326,16 @@ export type PonsStateResponse = {
     windowBlocks: number;
     caveats: string[];
   };
+};
+
+export type PonsFactoryFeed = {
+  fromBlock: number;
+  indexedBlock: number;
+  indexedHash: string;
+  headBlock: number;
+  observedAt: string;
+  lastAttemptAt: string;
+  lastError: string | null;
+  consecutiveFailures: number;
+  events: PonsTapeEvent[];
 };

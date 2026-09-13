@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": "./worker/index.ts",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}

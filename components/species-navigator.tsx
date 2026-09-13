@@ -40,27 +40,27 @@ export function SpeciesNavigator({
       <div className="flex flex-col gap-3 border-b border-foreground/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-signal">Verified observation cohort</p>
-            <p className="mt-1 text-xs text-foreground/42">
+            <p className="font-mono text-caption uppercase tracking-[0.2em] text-signal">Verified observation cohort</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               {coverage
                 ? `${coverage.observedSpecies} deeply observed from ${coverage.discoveredSpecies.toLocaleString()} discovered PAIR species`
                 : `${species.length} reference species`}
             </p>
           </div>
           {coverage ? (
-            <span className="hidden rounded-full border border-foreground/10 px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-foreground/30 lg:inline-flex">
+            <span className="hidden rounded-full border border-foreground/10 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground lg:inline-flex">
               ranked by market cap
             </span>
           ) : null}
         </div>
         <div className="relative w-full sm:w-64">
-          <Search aria-hidden="true" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-foreground/25" />
+          <Search aria-hidden="true" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Find species or habitat"
             aria-label="Find a species or habitat"
-            className="h-9 border-foreground/10 bg-black/15 pl-9 font-mono text-[10px] placeholder:text-foreground/20"
+            className="h-9 border-foreground/10 bg-black/15 pl-9 font-mono text-caption placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -80,19 +80,19 @@ export function SpeciesNavigator({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${selected ? "text-black/35" : "text-foreground/25"}`}>
+                <span className={`font-mono text-xs uppercase tracking-[0.14em] ${selected ? "text-black/35" : "text-muted-foreground"}`}>
                   #{item.rank ?? species.indexOf(item) + 1}
                 </span>
-                <span className={`font-mono text-[9px] ${item.change24h >= 0 ? "text-signal" : "text-danger"}`}>
+                <span className={`font-mono text-caption ${item.change24h >= 0 ? "text-signal" : "text-danger"}`}>
                   {change}
                 </span>
               </div>
               <div className="mt-2 flex items-end justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold tracking-tight">{item.symbol}</p>
-                  <p className={`mt-0.5 truncate text-[10px] ${selected ? "text-black/42" : "text-foreground/30"}`}>{item.name}</p>
+                  <p className={`mt-0.5 truncate text-caption ${selected ? "text-black/42" : "text-muted-foreground"}`}>{item.name}</p>
                 </div>
-                <p className={`shrink-0 font-mono text-[10px] ${selected ? "text-black/58" : "text-foreground/55"}`}>
+                <p className={`shrink-0 font-mono text-caption ${selected ? "text-black/58" : "text-muted-foreground"}`}>
                   {compactUsd.format(item.marketCapUsd)}
                 </p>
               </div>
@@ -103,7 +103,7 @@ export function SpeciesNavigator({
           );
         })}
         {filtered.length === 0 ? (
-          <div className="grid min-w-full place-items-center bg-[var(--surface-2)] px-4 py-6 font-mono text-[10px] uppercase tracking-[0.15em] text-foreground/30">
+          <div className="grid min-w-full place-items-center bg-[var(--surface-2)] px-4 py-6 font-mono text-caption uppercase tracking-[0.15em] text-muted-foreground">
             No species matches this query
           </div>
         ) : null}

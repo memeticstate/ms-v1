@@ -1,3 +1,4 @@
+import { quoteAssetLabel } from "@/lib/pons/quote-label";
 import type { PonsPulseMetric, PonsStateResponse } from "@/lib/pons/model";
 
 const WIDTH = 1600;
@@ -124,7 +125,7 @@ export async function downloadPulseCard(state: PonsStateResponse) {
   context.fillText("MOST ACTIVE OBSERVED LAUNCH", 74, 654);
   context.font = "600 38px Arial, sans-serif";
   context.fillStyle = state.pulse.leader ? "#a4b579" : "#e8e2d355";
-  context.fillText(state.pulse.leader ? `${state.pulse.leader.tokenSymbol} / ${state.pulse.leader.pairSymbol}` : "PULSE WARMING", 74, 705);
+  context.fillText(state.pulse.leader ? `${state.pulse.leader.tokenSymbol} / ${quoteAssetLabel(state.pulse.leader.pairSymbol)}` : "PULSE WARMING", 74, 705);
   context.font = "500 18px 'IBM Plex Mono', monospace";
   context.fillStyle = "#e8e2d355";
   context.fillText(state.pulse.leader ? `${state.pulse.leader.recentTrades.toLocaleString()} recent curve trades` : "No leader resolved in this interval", 74, 742);

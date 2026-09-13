@@ -130,7 +130,7 @@ export function MemeticStateApp() {
               <h1 className="text-sm font-semibold uppercase tracking-[0.18em]">
                 Memetic <span className="specimen-serif text-base font-normal italic normal-case tracking-normal text-signal">State</span>
               </h1>
-              <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-foreground/30">
+              <p className="mt-0.5 font-mono text-caption uppercase tracking-[0.15em] text-muted-foreground">
                 Cultural atlas for tokenized markets
               </p>
             </div>
@@ -138,12 +138,12 @@ export function MemeticStateApp() {
 
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-2 sm:flex">
-              <Network className="size-3.5 text-foreground/30" aria-hidden="true" />
-              <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-foreground/35">
+              <Network className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              <p className="font-mono text-caption uppercase tracking-[0.15em] text-muted-foreground">
                 {snapshot.coverage?.discoveredSpecies.toLocaleString() ?? snapshot.species.length} discovered · {snapshot.species.length} observed · {snapshot.edges.length} validated edges
               </p>
             </div>
-            <div className="rounded border border-foreground/10 bg-foreground/5 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-foreground/45">
+            <div className="rounded border border-foreground/10 bg-foreground/5 px-3 py-2 font-mono text-caption uppercase tracking-[0.14em] text-muted-foreground">
               {snapshot.chain} · {meta.reconciliation ? `#${meta.reconciliation.blockNumber.toLocaleString()}` : `Block ${snapshot.block.number}`}
             </div>
           </div>
@@ -154,14 +154,14 @@ export function MemeticStateApp() {
         <Tabs defaultValue="biosphere" className="gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
             <TabsList variant="line" className="h-10 gap-5 p-0">
-              <TabsTrigger value="biosphere" className="px-0 font-mono text-[10px] uppercase tracking-[0.15em]">
+              <TabsTrigger value="biosphere" className="px-0 font-mono text-sm uppercase tracking-[0.15em]">
                 <Activity aria-hidden="true" /> Biosphere
               </TabsTrigger>
-              <TabsTrigger value="block" className="px-0 font-mono text-[10px] uppercase tracking-[0.15em]">
+              <TabsTrigger value="block" className="px-0 font-mono text-sm uppercase tracking-[0.15em]">
                 <StateGlyph className="size-4" /> Chain block
               </TabsTrigger>
             </TabsList>
-            <p className="max-w-xl text-right text-xs leading-5 text-foreground/35">
+            <p className="max-w-xl text-right text-xs leading-5 text-muted-foreground">
               Stocks are the terrain. Community tokens are the species. Pools become the genetic links.
             </p>
           </div>
@@ -197,7 +197,7 @@ export function MemeticStateApp() {
           <TabsContent value="block"><ChainBlockView snapshot={snapshot} /></TabsContent>
         </Tabs>
 
-        <footer className="mt-4 flex flex-col justify-between gap-2 border-t border-foreground/10 px-1 pt-4 font-mono text-[9px] uppercase tracking-[0.14em] text-foreground/25 sm:flex-row">
+        <footer className="mt-4 flex flex-col justify-between gap-2 border-t border-foreground/10 px-1 pt-4 font-mono text-caption uppercase tracking-[0.14em] text-muted-foreground sm:flex-row">
           <span>
             {freshnessLabel}
             {meta.reconciliation ? ` · RPC ${meta.reconciliation.quorum}/${meta.reconciliation.providerCount} · #${meta.reconciliation.blockNumber.toLocaleString()}` : ""}
