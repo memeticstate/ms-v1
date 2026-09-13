@@ -1,8 +1,29 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "memetic-state-staging",
   "main": "./worker/index.ts",
+  "compatibility_date": "2026-09-13",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "memetic-state-staging",
+      "database_id": "ca51a6f5-a641-4bf2-96d1-76af802f486c",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "assets": {
+    "binding": "ASSETS"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
   "triggers": {
     "crons": ["* * * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
   }
 }
