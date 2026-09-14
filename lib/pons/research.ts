@@ -3,6 +3,7 @@ import type { PonsLaunchView, PonsResearchReading, PonsStateResponse, PonsTokenE
 export const RESEARCH_VERSION = "pons-evidence-v4";
 export const MAX_SIGNAL_LAG_BLOCKS = 3_000;
 export const MAX_STATE_AGE_MS = 2 * 60_000;
+export const MAX_INDEX_SUCCESS_AGE_MS = 4 * 60_000;
 export const MAX_HOLDER_AGE_MS = 10 * 60_000;
 export const MIN_PULSE_TRADES = 12;
 export const MIN_PULSE_ACTORS = 5;
@@ -10,11 +11,16 @@ export const MIN_MEANINGFUL_HOLDERS = 10;
 const age = (value: string | null | undefined, now: number) => value && Number.isFinite(Date.parse(value)) && Date.parse(value) <= now + 30_000 ? Math.max(0, now - Date.parse(value)) : Infinity;
 
 export function currentPonsEvidence(state: PonsStateResponse, now = Date.now()) {
-  return state.mode !== "empty" && state.mode !== "degraded"
-    && state.index.consecutiveFailures === 0 && state.collector.status !== "failed"
-    && state.integrity.pulseReconciled && state.index.liveLagBlocks <= MAX_SIGNAL_LAG_BLOCKS
+  // Freshness is derived from the current reconciled facts, not from the
+  // cached mode label. Otherwise a snapshot materialized while degraded can
+  // remain permanently degraded after the collector catches up.
+  return state.mode !== "empty"
+    && state.index.consecutiveFailures === 0
+    && state.collector.status !== "failed"
+    && state.integrity.pulseReconciled
+    && state.index.liveLagBlocks <= MAX_SIGNAL_LAG_BLOCKS
     && age(state.generatedAt, now) <= MAX_STATE_AGE_MS
-    && age(state.index.lastSuccessAt, now) <= MAX_STATE_AGE_MS;
+    && age(state.index.lastSuccessAt, now) <= MAX_INDEX_SUCCESS_AGE_MS;
 }
 
 export function assessLaunch(launch: PonsLaunchView, fresh: boolean, now = Date.now()): PonsResearchReading {
