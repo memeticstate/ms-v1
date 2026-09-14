@@ -3,7 +3,7 @@ import type { ResearchDossier } from "@/lib/premium/research";
 import type { RecentCurveResult } from "@/lib/premium/recent-curve";
 import { compareSources, type ResearchReport, type ResearchTask } from "./model";
 import { boundedRead, curveSource, holderSource, indexedSource, marketSource, unavailableSource } from "./sources";
-import { runResearchAgent, type researchModelConfig } from "./agent";
+import { runResearchAgent, runResearchSynthesis, type researchModelConfig } from "./agent";
 import { previousThesis, reviewResearch } from "./review";
 
 export async function investigate(task: ResearchTask, previous: ResearchReport | null, services: {
@@ -39,15 +39,50 @@ export async function investigate(task: ResearchTask, previous: ResearchReport |
   let thesis = previousThesis(task, previous);
   let reviewStatus: ResearchReport["reviewStatus"] = services.config ? "unavailable" : "not_configured";
   if (services.config) {
+    let aiStage = "draft";
     try {
       // Reserve part of the existing total budget for one review. No debate loop.
-      const draft = await runResearchAgent({ config: services.config, task, sources, changes: compareSources(previous, sources), read, deadline: services.deadline - 8_000, fetcher: services.fetcher });
+      if (services.config.runtime === "single-pass") {
+        await read("inspect_holder_snapshot");
+        await read("inspect_recent_curve");
+      }
+
+      const draft = services.config.runtime === "single-pass"
+        ? await runResearchSynthesis({
+            config: services.config,
+            task,
+            sources,
+            changes: compareSources(previous, sources),
+            deadline: services.deadline - 20_000,
+            fetcher: services.fetcher,
+          })
+        : await runResearchAgent({
+            config: services.config,
+            task,
+            sources,
+            changes: compareSources(previous, sources),
+            read,
+            deadline: services.deadline - 12_000,
+            fetcher: services.fetcher,
+          });
       steps.push({ tool: "Researcher", status: "complete", note: "Prepared a provisional reading for review." });
+
+      aiStage = "review";
       const reviewed = await reviewResearch({ config: services.config, task, draft, sources, previous: thesis, deadline: services.deadline, fetcher: services.fetcher });
       analysis = reviewed.analysis; thesis = reviewed.thesis; reviewStatus = "complete";
       steps.push({ tool: "Skeptic & editor", status: "complete", note: "Checked the draft against its evidence and saved one reviewed thesis." });
       analysisStatus = "complete";
-    } catch {
+    } catch (error) {
+      const name = error instanceof Error ? error.name : "UnknownError";
+      const message = error instanceof Error ? error.message : "unknown_error";
+
+      console.error("research AI stage failed", {
+        stage: aiStage,
+        name,
+        code: /^[a-zA-Z0-9_:-]{1,80}$/.test(message) ? message : "internal_error",
+        detail: message.slice(0, 300),
+      });
+
       steps.push({ tool: "Skeptic & editor", status: "unavailable", note: "A reviewed conclusion could not be completed. Earlier thesis memory retains its original date and evidence." });
       // Do not publish an unchecked draft or overwrite the previous reviewed thesis.
     }

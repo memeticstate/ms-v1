@@ -4,7 +4,8 @@ import type { ResearchAnalysis, ResearchSource, ResearchTask } from "./model";
 export function researchModelConfig(bindings: Record<string, unknown>) {
   const key = typeof bindings.OPENAI_API_KEY === "string" ? bindings.OPENAI_API_KEY.trim() : "";
   const model = typeof bindings.MEMETIC_RESEARCH_MODEL === "string" ? bindings.MEMETIC_RESEARCH_MODEL.trim() : "";
-  return key && model ? { key, model } : null;
+  const runtime = bindings.MEMETIC_RESEARCH_RUNTIME === "single-pass" ? ("single-pass" as const) : null;
+  return key && model ? { key, model, ...(runtime ? { runtime } : {}) } : null;
 }
 const text = z.string().trim().min(1).max(1200);
 const analysisSchema = z.object({
@@ -37,7 +38,8 @@ export async function requestResearchModel(options: {
       method: "POST", redirect: "manual", signal: controller.signal,
       headers: { Authorization: `Bearer ${options.config.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: options.config.model, instructions: options.instructions, input: options.input,
-        tools: options.tools, tool_choice: options.toolChoice, parallel_tool_calls: false, max_output_tokens: 2400, store: false }),
+        tools: options.tools, tool_choice: options.toolChoice, parallel_tool_calls: false,
+        reasoning: { effort: "low" }, max_output_tokens: 1600, store: false }),
     });
     if (!response.ok || Number(response.headers.get("content-length") ?? 0) > 100_000) throw new Error("analysis_unavailable");
     const reader = response.body?.getReader(); if (!reader) throw new Error("analysis_empty");
@@ -50,12 +52,87 @@ export async function requestResearchModel(options: {
   } finally { clearTimeout(timer); }
 }
 
+export async function runResearchSynthesis(options: {
+  config: { key: string; model: string }; task: ResearchTask; sources: ResearchSource[]; changes: string[];
+  deadline: number; fetcher?: typeof fetch;
+}): Promise<ResearchAnalysis> {
+  const citableSources = options.sources.filter(
+    source => source.freshness !== "unavailable"
+  );
+  const allowedCitationIds = citableSources.map(source => source.id);
+  const unavailableSourceIds = options.sources
+    .filter(source => source.freshness === "unavailable")
+    .map(source => source.id);
+
+  const input: unknown[] = [{
+    role: "user",
+    content: JSON.stringify({
+      token: options.task.tokenAddress,
+      question: options.task.question,
+      focus: options.task.focus,
+      observations: citableSources,
+      unavailableSourceIds,
+      allowedCitationIds,
+      citationRule:
+        "Every finding must cite one or more IDs from allowedCitationIds only. Never cite unavailableSourceIds and never invent a source ID.",
+      changes: options.changes,
+    }),
+  }];
+
+  const output = await requestResearchModel({
+    config: options.config,
+    instructions: INSTRUCTIONS,
+    input,
+    tools: [finish],
+    toolChoice: { type: "function", name: "finish_research" },
+    deadline: options.deadline,
+    fetcher: options.fetcher,
+  });
+
+  const calls = output.filter(item => item.type === "function_call");
+  if (calls.length !== 1 || calls[0].name !== "finish_research" || !calls[0].arguments) {
+    throw new Error("analysis_invalid_call");
+  }
+
+  const analysis = analysisSchema.parse(JSON.parse(calls[0].arguments));
+  const allowed = new Set(allowedCitationIds);
+
+  const invalidCitationIds = [
+    ...new Set(
+      analysis.findings.flatMap(finding =>
+        finding.sourceIds.filter(id => !allowed.has(id))
+      )
+    ),
+  ];
+
+  const findings = analysis.findings.filter(
+    finding =>
+      finding.sourceIds.length > 0 &&
+      finding.sourceIds.every(id => allowed.has(id))
+  );
+
+  if (invalidCitationIds.length > 0) {
+    console.warn("research synthesis rejected invalid citations", {
+      invalidCitationIds,
+      allowedCitationIds,
+      droppedFindings: analysis.findings.length - findings.length,
+    });
+  }
+
+  if (analysis.findings.length > 0 && findings.length === 0) {
+    throw new Error("analysis_invalid_citation");
+  }
+
+  return { ...analysis, findings };
+}
+
 export async function runResearchAgent(options: {
   config: { key: string; model: string }; task: ResearchTask; sources: ResearchSource[]; changes: string[];
   read: (name: string) => Promise<ResearchSource>; deadline: number; fetcher?: typeof fetch;
 }): Promise<ResearchAnalysis> {
   const input: unknown[] = [{ role: "user", content: JSON.stringify({ token: options.task.tokenAddress, question: options.task.question, focus: options.task.focus, observations: options.sources, changes: options.changes }) }];
   const seen = new Set<string>();
+  const availableSources = [...options.sources];
   for (let turn = 0; turn < 3; turn++) {
     const output = await requestResearchModel({ ...options, instructions: INSTRUCTIONS, input,
       tools: [...toolDefinitions.filter(t => !seen.has(t.name)), finish],
@@ -67,13 +144,14 @@ export async function runResearchAgent(options: {
     const args = JSON.parse(call.arguments);
     if (call.name === "finish_research") {
       const analysis = analysisSchema.parse(args);
-      const allowed = new Set(options.sources.filter(s => s.freshness !== "unavailable").map(s => s.id));
+      const allowed = new Set(availableSources.filter(s => s.freshness !== "unavailable").map(s => s.id));
       if (analysis.findings.some(f => f.sourceIds.some(id => !allowed.has(id)))) throw new Error("analysis_invalid_citation");
       return analysis;
     }
     if (turn === 2 || !toolDefinitions.some(t => t.name === call.name) || seen.has(call.name!) || !args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length) throw new Error("analysis_invalid_tool");
     seen.add(call.name!);
     const source = await options.read(call.name!);
+    availableSources.push(source);
     // Keep reasoning items as required by the Responses function-calling protocol.
     input.push(...output, { type: "function_call_output", call_id: call.call_id, output: JSON.stringify(source) });
   }

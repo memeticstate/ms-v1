@@ -1,4 +1,8 @@
 import { ResearchStore } from "@/db/researcher";
+import { readPremiumDossier } from "@/db/premium-research";
+import { refreshRecentCurveCheck } from "@/db/premium-recent-curve";
+import { servePonsState } from "@/lib/ingestion/pons-live";
+import { lookupToken } from "@/lib/tokens/discovery";
 import { evaluatePremiumAccess } from "@/lib/entitlements/token-gate";
 import { researchModelConfig } from "./agent";
 import { investigate } from "./engine";
@@ -19,14 +23,34 @@ export async function runNextResearch(store: ResearchStore, services: {
     }
     const report = await services.investigate(task, await store.previous(job.userId, job.assignmentId));
     await store.finish(job, report.analysisStatus === "complete" && report.sources.every(s => s.freshness !== "unavailable") ? "complete" : "partial", report, null);
-  } catch {
-    await store.finish(job, "failed", null, "check_unavailable");
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "UnknownError";
+    const message = error instanceof Error ? error.message : "unknown_error";
+
+    // Preserve short machine-readable internal errors without exposing
+    // arbitrary upstream response bodies or secrets.
+    const simple = /^[a-zA-Z0-9_:-]{1,80}$/.test(message)
+      ? message
+      : "";
+
+    const code = simple || `internal_${name
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .toLowerCase()
+      .slice(0, 60)}`;
+
+    console.error("research run failed", {
+      code,
+      name,
+      detail: simple ? undefined : message.slice(0, 300),
+    });
+
+    await store.finish(job, "failed", null, code);
   }
 }
 
 /** One bounded job per wake; scheduled jobs use the same verified holder boundary. */
 export async function processResearchQueue(db: D1Database, bindings: Record<string, unknown>, scheduled = false) {
-  const deadline = Date.now() + 26_000, store = new ResearchStore(db);
+  const deadline = Date.now() + 55_000, store = new ResearchStore(db);
   if (scheduled) await store.enqueueDue();
   await runNextResearch(store, {
     eligible: async userId => {
@@ -34,9 +58,6 @@ export async function processResearchQueue(db: D1Database, bindings: Record<stri
       return gate.access.active && Boolean(gate.access.expiresAt) && Date.parse(gate.access.expiresAt!) > Date.now() + 27_000;
     },
     investigate: async (task, previous) => {
-      const [{ lookupToken }, { servePonsState }, { readPremiumDossier }, { refreshRecentCurveCheck }] = await Promise.all([
-        import("@/lib/tokens/discovery"), import("@/lib/ingestion/pons-live"), import("@/db/premium-research"), import("@/db/premium-recent-curve"),
-      ]);
       return investigate(task, previous, { lookup: lookupToken,
         dossier: async token => readPremiumDossier(await servePonsState(undefined, token), { token, cursor: null, through: null, windowBlocks: 25_000, kind: "all", scope: "window" }),
         recent: refreshRecentCurveCheck, config: researchModelConfig(bindings), deadline });

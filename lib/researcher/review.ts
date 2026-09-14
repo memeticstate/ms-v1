@@ -46,18 +46,70 @@ export async function reviewResearch(options: {
   config: { key: string; model: string }; task: ResearchTask; draft: ResearchAnalysis;
   sources: ResearchSource[]; previous: ResearchThesis | null; deadline: number; fetcher?: typeof fetch;
 }): Promise<{ analysis: ResearchAnalysis; thesis: ResearchThesis }> {
-  const output = await requestResearchModel({ ...options, instructions, tools: [finish], toolChoice: { type: "function", name: "finish_review" },
-    input: [{ role: "user", content: JSON.stringify({ token: options.task.tokenAddress, question: options.task.question, draft: options.draft, observations: options.sources, previousThesis: options.previous }) }] });
+  const citableSources = options.sources.filter(
+    source => source.freshness !== "unavailable"
+  );
+  const allowedCitationIds = citableSources.map(source => source.id);
+  const unavailableSourceIds = options.sources
+    .filter(source => source.freshness === "unavailable")
+    .map(source => source.id);
+
+  const output = await requestResearchModel({
+    ...options,
+    instructions,
+    tools: [finish],
+    toolChoice: { type: "function", name: "finish_review" },
+    input: [{
+      role: "user",
+      content: JSON.stringify({
+        token: options.task.tokenAddress,
+        question: options.task.question,
+        draft: options.draft,
+        observations: citableSources,
+        unavailableSourceIds,
+        allowedCitationIds,
+        citationRule:
+          "Every support or challenge finding must cite one or more IDs from allowedCitationIds only. Never cite unavailableSourceIds and never invent a source ID. Missing coverage belongs in unknowns.",
+        previousThesis: options.previous,
+      }),
+    }],
+  });
+
   const calls = output.filter(item => item.type === "function_call");
   if (calls.length !== 1 || calls[0].name !== "finish_review" || !calls[0].arguments) throw new Error("review_invalid_call");
+
   const review = schema.parse(JSON.parse(calls[0].arguments));
-  const available = new Set(options.sources.filter(s => s.freshness !== "unavailable").map(s => s.id));
-  if ([...review.support, ...review.challenges].some(f => f.sourceIds.some(id => !available.has(id)))) throw new Error("review_invalid_citation");
-  if (options.previous && review.statement !== options.previous.statement) throw new Error("review_changed_thesis");
-  if ((review.verdict === "supported" && !review.support.length) || (review.verdict === "challenged" && !review.challenges.length)) throw new Error("review_missing_evidence");
+  const available = new Set(allowedCitationIds);
+
+  const invalidCitationIds = [
+    ...new Set(
+      [...review.support, ...review.challenges].flatMap(finding =>
+        finding.sourceIds.filter(id => !available.has(id))
+      )
+    ),
+  ];
+
+  if (invalidCitationIds.length > 0) {
+    console.warn("research review rejected invalid citations", {
+      invalidCitationIds,
+      allowedCitationIds,
+    });
+    throw new Error("review_invalid_citation");
+  }
+
+  if (options.previous && review.statement !== options.previous.statement) {
+    throw new Error("review_changed_thesis");
+  }
+
+  if (
+    (review.verdict === "supported" && !review.support.length) ||
+    (review.verdict === "challenged" && !review.challenges.length)
+  ) {
+    throw new Error("review_missing_evidence");
+  }
   // A positive/negative current verdict must be anchored to recent relevant evidence.
   const verdictEvidence = review.verdict === "supported" ? review.support : review.challenges;
-  if (review.verdict !== "unresolved" && !verdictEvidence.some(f => f.sourceIds.some(id => options.sources.some(s => s.id === id && s.freshness === "recent")))) {
+  if (review.verdict !== "unresolved" && !verdictEvidence.some(f => f.sourceIds.some(id => citableSources.some(s => s.id === id && s.freshness === "recent")))) {
     review.verdict = "unresolved";
     review.conclusion = "The available evidence does not establish a current verdict. The dated observations and coverage limits are preserved below.";
   }

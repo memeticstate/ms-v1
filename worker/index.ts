@@ -42,9 +42,21 @@ const worker = {
 
     if (url.pathname === "/api/premium/researcher" && ["GET", "POST", "PATCH", "DELETE"].includes(request.method)) {
       const response = await import("@/app/api/premium/researcher/route").then(m => m.GET(request));
-      if (response.ok && ["GET", "POST"].includes(request.method)) ctx.waitUntil(import("@/lib/researcher/runner")
-        .then(m => m.processResearchQueue(env.DB, env as unknown as Record<string, unknown>))
-        .catch(() => console.error("researcher queue unavailable")));
+
+      // Research execution is awaited on explicit POSTs.
+      // GET is read-only and must not repeatedly dispatch the queue while the UI polls.
+      if (response.ok && request.method === "POST") {
+        try {
+          await import("@/lib/researcher/runner")
+            .then(m => m.processResearchQueue(
+              env.DB,
+              env as unknown as Record<string, unknown>
+            ));
+        } catch (error) {
+          console.error("researcher queue unavailable", error);
+        }
+      }
+
       return withSecurityHeaders(response);
     }
 
