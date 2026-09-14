@@ -36,7 +36,7 @@ test("landing summaries translate the same policy and never mutate app data", ()
 
 test("delayed and expired data never keeps a positive landing badge", () => {
   const delayed = { ...state, index: { ...state.index, liveLagBlocks: 3_600_000 } };
-  for (const item of [landingSignal(launch, delayed, now), landingSignal(launch, state, now + 121_000)]) {
+  for (const item of [landingSignal(launch, delayed, now), landingSignal(launch, state, now + 241_000)]) {
     assert.equal(item.signal, "historical");
     assert.equal(item.label, "Past activity");
     assert.equal(item.tone, "neutral");

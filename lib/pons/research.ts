@@ -2,7 +2,7 @@ import type { PonsLaunchView, PonsResearchReading, PonsStateResponse, PonsTokenE
 
 export const RESEARCH_VERSION = "pons-evidence-v4";
 export const MAX_SIGNAL_LAG_BLOCKS = 3_000;
-export const MAX_STATE_AGE_MS = 2 * 60_000;
+export const MAX_STATE_AGE_MS = 4 * 60_000;
 export const MAX_INDEX_SUCCESS_AGE_MS = 4 * 60_000;
 export const MAX_HOLDER_AGE_MS = 10 * 60_000;
 export const MIN_PULSE_TRADES = 12;
@@ -19,6 +19,7 @@ export function currentPonsEvidence(state: PonsStateResponse, now = Date.now()) 
     && state.collector.status !== "failed"
     && state.integrity.pulseReconciled
     && state.index.liveLagBlocks <= MAX_SIGNAL_LAG_BLOCKS
+    && age(state.generatedAt, now) <= MAX_STATE_AGE_MS
     && age(state.index.lastSuccessAt, now) <= MAX_INDEX_SUCCESS_AGE_MS;
 }
 

@@ -64,7 +64,8 @@ test("fresh collector timestamps cannot disguise an old chain cursor", () => {
     integrity: { pulseReconciled: true }, index: { consecutiveFailures: 0, liveLagBlocks: 3_104_761, lastSuccessAt: new Date(now).toISOString() } };
   assert.equal(currentPonsEvidence(state, now), false);
   assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now), true);
-  assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now + 180_000), false);
+  assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now + 180_000), true);
+  assert.equal(currentPonsEvidence({ ...state, index: { ...state.index, liveLagBlocks: 10 } }, now + 241_000), false);
 });
 test("RPC transport negotiates unsupported batches without changing request IDs", async () => {
   const original = globalThis.fetch; let calls = 0;
@@ -310,12 +311,12 @@ test("accepts two-provider Robinhood evidence while reserving healthy status for
 });
 
 
-test("scheduled PONS commits refresh the durable state without using cache age as market freshness", async () => {
+test("scheduled PONS commits refresh the durable state inside the freshness window", async () => {
   const [cycle, research] = await Promise.all([
     readFile(new URL("../lib/ingestion/collector-cycle.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/pons/research.ts", import.meta.url), "utf8"),
   ]);
   assert.match(cycle, /materializePonsState/);
   assert.match(cycle, /pons-materialize/);
-  assert.doesNotMatch(research, /age\(state\.generatedAt/);
+  assert.match(research, /age\(state\.generatedAt/);
 });
