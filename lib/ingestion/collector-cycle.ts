@@ -1,6 +1,6 @@
 import { runAffinityCollection } from "@/lib/ingestion/pair-live";
 import { runPonsHistoryCollection } from "@/lib/ingestion/pons-history";
-import { runPonsCollection } from "@/lib/ingestion/pons-live";
+import { materializePonsState, runPonsCollection } from "@/lib/ingestion/pons-live";
 import { runFactoryCollection } from "@/lib/ingestion/pons-factory";
 import type { PonsV1GenerationId } from "@/lib/pons/constants";
 import type { CollectionTrigger } from "@/db/engine-ledger";
@@ -50,5 +50,15 @@ export async function runScheduledCollectorCycle(scheduledTime: number) {
   }
   if (minuteSlot === 2) return [factory, await runHistoryCollectorCycle("scheduled", "v1-current")];
   if (minuteSlot === 4) return [factory, await runHistoryCollectorCycle("scheduled", "v1-legacy")];
-  return [factory, ...await runPrimaryCollectorCycle("scheduled", { includeEvidence: false, includeFactory: false })];
+  const live = await capture("pons-v2", () => runPonsCollection("scheduled"));
+
+  // Keep the durable public state artifact aligned with the canonical live
+  // cursor. Materialization is downstream of a successful PONS commit, never
+  // a prerequisite for the collector itself to succeed.
+  if (live.status === "fulfilled" && live.value.status === "recorded") {
+    const materialized = await capture("pons-materialize", () => materializePonsState());
+    return [factory, live, materialized];
+  }
+
+  return [factory, live];
 }

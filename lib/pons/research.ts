@@ -19,7 +19,6 @@ export function currentPonsEvidence(state: PonsStateResponse, now = Date.now()) 
     && state.collector.status !== "failed"
     && state.integrity.pulseReconciled
     && state.index.liveLagBlocks <= MAX_SIGNAL_LAG_BLOCKS
-    && age(state.generatedAt, now) <= MAX_STATE_AGE_MS
     && age(state.index.lastSuccessAt, now) <= MAX_INDEX_SUCCESS_AGE_MS;
 }
 

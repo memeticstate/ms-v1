@@ -308,3 +308,14 @@ test("accepts two-provider Robinhood evidence while reserving healthy status for
     accepted: true, degraded: true, multiplierMismatch: true,
   });
 });
+
+
+test("scheduled PONS commits refresh the durable state without using cache age as market freshness", async () => {
+  const [cycle, research] = await Promise.all([
+    readFile(new URL("../lib/ingestion/collector-cycle.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/pons/research.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(cycle, /materializePonsState/);
+  assert.match(cycle, /pons-materialize/);
+  assert.doesNotMatch(research, /age\(state\.generatedAt/);
+});
