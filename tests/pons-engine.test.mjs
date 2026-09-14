@@ -24,7 +24,7 @@ const { classifyPonsSignal, normalizePonsWindowBlocks, ponsMomentumPercent, pons
   await vite.ssrLoadModule("/lib/pons/signals.ts");
 const { assessRobinhoodRpcQuorum } = await vite.ssrLoadModule("/lib/ingestion/rpc-quorum.ts");
 const { ponsCollectionBudget, PONS_MAX_BLOCKS_PER_RUN } = await vite.ssrLoadModule("/lib/pons/budget.ts");
-const { isRetryablePonsRpcError } = await vite.ssrLoadModule("/lib/ingestion/pons-rpc.ts");
+const { isRetryablePonsRpcError, ponsLogRangeLimit } = await vite.ssrLoadModule("/lib/ingestion/pons-rpc.ts");
 const { assessLaunch, currentPonsEvidence } = await vite.ssrLoadModule("/lib/pons/research.ts");
 const { rpcEnvelopes } = await vite.ssrLoadModule("/lib/ingestion/rpc-transport.ts");
 
@@ -206,6 +206,20 @@ test("retries provider pressure while failing closed on semantic RPC errors", as
   assert.equal(isRetryablePonsRpcError(new Error("rpc_-32005")), true);
   assert.equal(isRetryablePonsRpcError(new Error("timeout")), true);
   assert.equal(isRetryablePonsRpcError(new Error("pons_chain_mismatch")), false);
+
+  assert.equal(ponsLogRangeLimit(new Error(
+    "eth_getLogs block range too large: 1600 blocks requested, filtered queries on this chain are limited to 200 blocks."
+  )), 200);
+
+  assert.equal(ponsLogRangeLimit(new Error(
+    "Under the Free tier plan, you can make eth_getLogs requests with up to a 10 block range."
+  )), 10);
+
+  assert.equal(ponsLogRangeLimit(new Error(
+    "eth_getLogs is limited to a 5 range, upgrade from discover plan."
+  )), 5);
+
+  assert.equal(ponsLogRangeLimit(new Error("http_429")), null);
 
   const rpc = await readFile(new URL("../lib/ingestion/pons-rpc.ts", import.meta.url), "utf8");
   assert.match(await readFile(new URL("../lib/ingestion/rpc-transport.ts", import.meta.url), "utf8"), /retry-after/);

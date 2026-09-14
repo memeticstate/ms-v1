@@ -53,16 +53,11 @@ const DEFAULT_PROVIDERS: Provider[] = [
 ];
 
 export async function getPonsFactoryLogs(fromBlock: number, toBlock: number, deadline = Infinity) {
-  const { value } = await withProvider(async (candidate) => {
-    const batch = await postBatch(candidate, [{ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
-      address: PONS_V2_FACTORY, fromBlock: `0x${fromBlock.toString(16)}`, toBlock: `0x${toBlock.toString(16)}`,
-      topics: [[PONS_TOPICS.launch, PONS_TOPICS.swept, PONS_TOPICS.graduated, PONS_TOPICS.permanentlyLocked]],
-    }] }], false, deadline);
-    const payload = resultMap(batch.envelopes).get(1);
-    if (!Array.isArray(payload) || !payload.every(validRpcLog)) throw new Error("invalid_factory_log_response");
-    return payload.filter((log: RpcLog) => !log.removed);
-  }, false, 0, deadline);
-  return value as RpcLog[];
+  const result = await requestLogFiltersAdaptive([{
+    address: PONS_V2_FACTORY,
+    topics: [[PONS_TOPICS.launch, PONS_TOPICS.swept, PONS_TOPICS.graduated, PONS_TOPICS.permanentlyLocked]],
+  }], fromBlock, toBlock, false, 0, deadline);
+  return result.logsByFilter[0] ?? [];
 }
 
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
@@ -75,8 +70,10 @@ const PROVIDER_COOLDOWN_WAIT_MS = 900;
 const PROVIDER_BACKOFF_BASE_MS = 900;
 const PROVIDER_BACKOFF_MAX_MS = 30_000;
 const LOG_RETRY_DELAYS_MS = [260, 720] as const;
+const MAX_LOG_CHUNKS_PER_PROVIDER = 32;
 
 const providerHealth = new Map<string, ProviderHealth>();
+const providerLogRangeLimits = new Map<string, number>();
 
 function delay(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -88,6 +85,39 @@ function rpcErrorCode(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (/abort|timeout/i.test(message)) return "timeout";
   return message.toLowerCase().replace(/[^a-z0-9-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96) || "network_error";
+}
+
+export function ponsLogRangeLimit(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  const patterns = [
+    /limited to (?:a )?(\d+)\s+blocks?/i,
+    /up to (?:a )?(\d+)\s+blocks?\s+range/i,
+    /limited to (?:a )?(\d+)\s+(?:blocks?\s+)?range/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    const value = match ? Number.parseInt(match[1], 10) : NaN;
+    if (Number.isSafeInteger(value) && value > 0) return value;
+  }
+
+  const suggested = message.match(
+    /(?:retry with the range|range should work)[^0-9]*(\d+)\s*-\s*(\d+)/i
+  );
+  if (suggested) {
+    const first = Number.parseInt(suggested[1], 10);
+    const last = Number.parseInt(suggested[2], 10);
+    const value = last - first + 1;
+    if (Number.isSafeInteger(value) && value > 0) return value;
+  }
+
+  return null;
+}
+
+function isProviderLogCapabilityError(error: unknown) {
+  return rpcErrorCode(error) === "pons_log_range_capacity"
+    || ponsLogRangeLimit(error) !== null;
 }
 
 export function isRetryablePonsRpcError(error: unknown) {
@@ -200,6 +230,202 @@ async function postBatch(provider: Provider, requests: RpcRequest[], tolerateIte
   return { envelopes, latencyMs: Date.now() - startedAt };
 }
 
+type LogFilter = {
+  address?: string | string[];
+  topics?: unknown[];
+};
+
+type AdaptiveLogRead = {
+  logsByFilter: RpcLog[][];
+  latencyMs: number;
+  provider: string;
+};
+
+function dedupeRpcLogs(logs: RpcLog[]) {
+  const seen = new Set<string>();
+  return logs.filter((log) => {
+    const key = `${log.blockHash}:${log.transactionHash}:${log.logIndex}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function requestLogFiltersOnProvider(
+  provider: Provider,
+  filters: LogFilter[],
+  fromBlock: number,
+  toBlock: number,
+  deadline = Infinity,
+) {
+  const blockCount = toBlock - fromBlock + 1;
+  if (blockCount <= 0) throw new Error("pons_log_range_invalid");
+
+  let chunkSize = Math.min(
+    blockCount,
+    providerLogRangeLimits.get(provider.url) ?? blockCount,
+  );
+
+  const assertCapacity = () => {
+    const chunks = Math.ceil(blockCount / chunkSize);
+    if (chunks > MAX_LOG_CHUNKS_PER_PROVIDER) {
+      throw new PonsRpcError(
+        "pons_log_range_capacity",
+        `Provider ${provider.name} would require ${chunks} eth_getLogs chunks for ${blockCount} blocks`,
+      );
+    }
+  };
+
+  if (providerLogRangeLimits.has(provider.url)) assertCapacity();
+
+  const logsByFilter = filters.map(() => [] as RpcLog[]);
+  let latencyMs = 0;
+  let cursor = fromBlock;
+
+  while (cursor <= toBlock) {
+    if (Date.now() >= deadline) throw new Error("rpc_deadline_exhausted");
+
+    const chunkTo = Math.min(toBlock, cursor + chunkSize - 1);
+
+    try {
+      const batch = await postBatch(
+        provider,
+        filters.map((filter, index): RpcRequest => ({
+          jsonrpc: "2.0",
+          id: index + 1,
+          method: "eth_getLogs",
+          params: [{
+            ...filter,
+            fromBlock: `0x${cursor.toString(16)}`,
+            toBlock: `0x${chunkTo.toString(16)}`,
+          }],
+        })),
+        false,
+        deadline,
+      );
+
+      latencyMs += batch.latencyMs;
+      const byId = resultMap(batch.envelopes);
+
+      filters.forEach((_filter, index) => {
+        const payload = byId.get(index + 1);
+        if (!Array.isArray(payload)) throw new Error("invalid_log_response");
+
+        const parsed = payload.filter(validRpcLog);
+        if (parsed.length !== payload.length) throw new Error("invalid_log_record");
+
+        logsByFilter[index].push(
+          ...parsed.filter((log: RpcLog) => !log.removed),
+        );
+      });
+
+      cursor = chunkTo + 1;
+
+      if (cursor <= toBlock && PROVIDER_REQUEST_GAP_MS > 0) {
+        await delay(PROVIDER_REQUEST_GAP_MS);
+      }
+    } catch (error) {
+      const learnedLimit = ponsLogRangeLimit(error);
+
+      if (learnedLimit && learnedLimit < chunkSize) {
+        const existing = providerLogRangeLimits.get(provider.url);
+        providerLogRangeLimits.set(
+          provider.url,
+          existing ? Math.min(existing, learnedLimit) : learnedLimit,
+        );
+
+        chunkSize = learnedLimit;
+        assertCapacity();
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return {
+    logsByFilter: logsByFilter.map(dedupeRpcLogs),
+    latencyMs,
+  };
+}
+
+async function requestLogFiltersAdaptive(
+  filters: LogFilter[],
+  fromBlock: number,
+  toBlock: number,
+  archive = false,
+  preferredIndex = 0,
+  deadline = Infinity,
+  depth = 0,
+): Promise<AdaptiveLogRead> {
+  try {
+    const result = await withBoundedRetry(
+      (attempt) => withProvider(
+        (provider) => requestLogFiltersOnProvider(
+          provider,
+          filters,
+          fromBlock,
+          toBlock,
+          deadline,
+        ),
+        archive,
+        preferredIndex + attempt,
+        deadline,
+      ),
+      deadline,
+    );
+
+    return {
+      logsByFilter: result.value.logsByFilter,
+      latencyMs: result.value.latencyMs,
+      provider: result.provider.name,
+    };
+  } catch (error) {
+    const blockCount = toBlock - fromBlock + 1;
+
+    if (
+      !canSplitLogRange(error)
+      || blockCount <= 1
+      || depth >= 8
+    ) throw error;
+
+    const midpoint = fromBlock + Math.floor(blockCount / 2) - 1;
+
+    const left = await requestLogFiltersAdaptive(
+      filters,
+      fromBlock,
+      midpoint,
+      archive,
+      preferredIndex,
+      deadline,
+      depth + 1,
+    );
+
+    const right = await requestLogFiltersAdaptive(
+      filters,
+      midpoint + 1,
+      toBlock,
+      archive,
+      preferredIndex,
+      deadline,
+      depth + 1,
+    );
+
+    return {
+      logsByFilter: filters.map((_filter, index) =>
+        dedupeRpcLogs([
+          ...(left.logsByFilter[index] ?? []),
+          ...(right.logsByFilter[index] ?? []),
+        ])
+      ),
+      latencyMs: left.latencyMs + right.latencyMs,
+      provider: [...new Set(
+        `${left.provider}+${right.provider}`.split("+")
+      )].join("+"),
+    };
+  }
+}
+
 export async function readPonsContracts(requests: RpcRequest[]) {
   const { value, provider } = await withProvider((candidate) => postBatch(candidate, requests, true));
   return { envelopes: value.envelopes, provider: provider.name };
@@ -237,7 +463,9 @@ async function withProvider<T>(operation: (provider: Provider) => Promise<T>, ar
       return { value, provider };
     } catch (error) {
       lastError = error;
-      if (rpcErrorCode(error) !== "pons_rpc_backoff_active") markProviderFailure(provider, error);
+      if (rpcErrorCode(error) !== "pons_rpc_backoff_active" && !isProviderLogCapabilityError(error)) {
+        markProviderFailure(provider, error);
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new PonsRpcError("pons_rpc_unavailable", "No PONS RPC provider succeeded");
@@ -329,34 +557,95 @@ export async function getPonsBlocks(blockNumbers: number[], deadline: number) {
 export async function readRecentPonsCurve(tokenAddress: string, curveAddress: string, launchBlock: number) {
   if (!ADDRESS.test(tokenAddress) || !ADDRESS.test(curveAddress) || !Number.isSafeInteger(launchBlock) || launchBlock < 0) throw new Error("invalid_recent_curve");
   const deadline = Date.now() + 18_000;
+
   const { value, provider } = await withProvider(async candidate => {
-    const request = async (requests: RpcRequest[]) => resultMap((await postBatch(candidate, requests, false, deadline)).envelopes);
+    const request = async (requests: RpcRequest[]) =>
+      resultMap((await postBatch(candidate, requests, false, deadline)).envelopes);
+
     const heads = await request([
       { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] },
       { jsonrpc: "2.0", id: 2, method: "eth_getBlockByNumber", params: ["latest", false] },
     ]);
+
     if (heads.get(1) !== `0x${PONS_CHAIN_ID.toString(16)}`) throw new Error("pons_chain_mismatch");
+
     const head = parseBlock(heads.get(2));
-    if (!Number.isSafeInteger(head.number) || Date.now() - head.timestamp * 1000 > RECENT_CURVE_FRESH_MS || head.timestamp * 1000 - Date.now() > 30_000) throw new Error("recent_curve_head_stale");
+    if (!Number.isSafeInteger(head.number)
+      || Date.now() - head.timestamp * 1000 > RECENT_CURVE_FRESH_MS
+      || head.timestamp * 1000 - Date.now() > 30_000) {
+      throw new Error("recent_curve_head_stale");
+    }
+
     const throughBlock = head.number - PONS_FINALITY_BLOCKS;
     const fromBlock = Math.max(launchBlock, throughBlock - RECENT_CURVE_BLOCKS + 1);
     if (throughBlock < fromBlock) throw new Error("recent_curve_awaiting_confirmations");
-    const fromHex = `0x${fromBlock.toString(16)}`, throughHex = `0x${throughBlock.toString(16)}`;
+
+    const fromHex = `0x${fromBlock.toString(16)}`;
+    const throughHex = `0x${throughBlock.toString(16)}`;
+
+    const logRead = await requestLogFiltersOnProvider(
+      candidate,
+      [{
+        address: curveAddress,
+        topics: [[PONS_TOPICS.curveBuy, PONS_TOPICS.curveSell]],
+      }],
+      fromBlock,
+      throughBlock,
+      deadline,
+    );
+
     const result = await request([
-      { jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ address: curveAddress, fromBlock: fromHex, toBlock: throughHex, topics: [[PONS_TOPICS.curveBuy, PONS_TOPICS.curveSell]] }] },
       { jsonrpc: "2.0", id: 2, method: "eth_getBlockByNumber", params: [fromHex, false] },
       { jsonrpc: "2.0", id: 3, method: "eth_getBlockByNumber", params: [throughHex, false] },
     ]);
-    const from = parseBlock(result.get(2)), through = parseBlock(result.get(3));
-    if (from.number !== fromBlock || through.number !== throughBlock || from.timestamp > through.timestamp || through.timestamp > head.timestamp) throw new Error("recent_curve_invalid_window");
-    const logs = result.get(1);
-    if (!Array.isArray(logs)) throw new Error("recent_curve_invalid_response");
-    const summary = summarizeRecentCurveLogs(logs, curveAddress, fromBlock, throughBlock, through.hash);
-    const confirm = parseBlock((await request([{ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: [throughHex, false] }])).get(1));
-    if (confirm.number !== throughBlock || confirm.hash !== through.hash) throw new Error("recent_curve_reorg");
-    return { tokenAddress, curveAddress, checkedAt: new Date().toISOString(), headBlock: head.number, headObservedAt: new Date(head.timestamp * 1000).toISOString(),
-      fromBlock, throughBlock, fromTime: new Date(from.timestamp * 1000).toISOString(), throughTime: new Date(through.timestamp * 1000).toISOString(), throughHash: through.hash, ...summary };
+
+    const from = parseBlock(result.get(2));
+    const through = parseBlock(result.get(3));
+
+    if (from.number !== fromBlock
+      || through.number !== throughBlock
+      || from.timestamp > through.timestamp
+      || through.timestamp > head.timestamp) {
+      throw new Error("recent_curve_invalid_window");
+    }
+
+    const logs = logRead.logsByFilter[0] ?? [];
+    const summary = summarizeRecentCurveLogs(
+      logs,
+      curveAddress,
+      fromBlock,
+      throughBlock,
+      through.hash,
+    );
+
+    const confirm = parseBlock((
+      await request([{
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_getBlockByNumber",
+        params: [throughHex, false],
+      }])
+    ).get(1));
+
+    if (confirm.number !== throughBlock || confirm.hash !== through.hash) {
+      throw new Error("recent_curve_reorg");
+    }
+
+    return {
+      tokenAddress,
+      curveAddress,
+      checkedAt: new Date().toISOString(),
+      headBlock: head.number,
+      headObservedAt: new Date(head.timestamp * 1000).toISOString(),
+      fromBlock,
+      throughBlock,
+      fromTime: new Date(from.timestamp * 1000).toISOString(),
+      throughTime: new Date(through.timestamp * 1000).toISOString(),
+      throughHash: through.hash,
+      ...summary,
+    };
   });
+
   return { ...value, provider: provider.name };
 }
 
@@ -367,40 +656,36 @@ async function requestPonsLogs(
   preferredIndex = 0,
   deadline = Infinity,
 ): Promise<PonsLogBatch> {
-  const { value, provider } = await withProvider(async (candidate) => {
-    const batch = await postBatch(candidate, [
-      {
-        jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
-          address: PONS_V2_FACTORY,
-          fromBlock: `0x${fromBlock.toString(16)}`,
-          toBlock: `0x${toBlock.toString(16)}`,
-          topics: [[PONS_TOPICS.launch, PONS_TOPICS.swept, PONS_TOPICS.graduated, PONS_TOPICS.permanentlyLocked]],
-        }],
-      },
-      {
-        jsonrpc: "2.0", id: 2, method: "eth_getLogs", params: [{
-          fromBlock: `0x${fromBlock.toString(16)}`,
-          toBlock: `0x${toBlock.toString(16)}`,
-          topics: [[PONS_TOPICS.curveBuy, PONS_TOPICS.curveSell]],
-        }],
-      },
-    ], false, deadline);
-    const byId = resultMap(batch.envelopes);
-    const factoryPayload = byId.get(1);
-    const curvePayload = byId.get(2);
-    if (!Array.isArray(factoryPayload) || !Array.isArray(curvePayload)) throw new Error("invalid_log_response");
-    const factoryLogs = factoryPayload.filter(validRpcLog).filter((log) => !log.removed);
-    const curveLogs = curvePayload.filter(validRpcLog).filter((log) => !log.removed);
-    if (factoryLogs.length !== factoryPayload.length || curveLogs.length !== curvePayload.length) throw new Error("invalid_log_record");
-    return { factoryLogs, curveLogs, latencyMs: batch.latencyMs };
-  }, archive, preferredIndex, deadline);
-  return { ...value, provider: provider.name, fromBlock, toBlock };
+  const result = await requestLogFiltersAdaptive([
+    {
+      address: PONS_V2_FACTORY,
+      topics: [[PONS_TOPICS.launch, PONS_TOPICS.swept, PONS_TOPICS.graduated, PONS_TOPICS.permanentlyLocked]],
+    },
+    {
+      topics: [[PONS_TOPICS.curveBuy, PONS_TOPICS.curveSell]],
+    },
+  ], fromBlock, toBlock, archive, preferredIndex, deadline);
+
+  return {
+    factoryLogs: result.logsByFilter[0] ?? [],
+    curveLogs: result.logsByFilter[1] ?? [],
+    latencyMs: result.latencyMs,
+    provider: result.provider,
+    fromBlock,
+    toBlock,
+  };
 }
 
 function canSplitLogRange(error: unknown) {
+  if (ponsLogRangeLimit(error) !== null) return true;
+
   const code = rpcErrorCode(error);
-  return code === "timeout" || code === "http_413" || code === "http_504"
-    || code === "rpc_-32005" || code === "rpc_-32016";
+  return code === "timeout"
+    || code === "http_413"
+    || code === "http_504"
+    || code === "rpc_-32005"
+    || code === "rpc_-32016"
+    || code === "pons_log_range_capacity";
 }
 
 async function getPonsLogsAdaptive(
@@ -411,25 +696,53 @@ async function getPonsLogsAdaptive(
   deadline = Infinity,
 ): Promise<PonsLogBatch> {
   try {
-    return await withBoundedRetry((attempt) => requestPonsLogs(
+    return await requestPonsLogs(
       fromBlock,
       toBlock,
       archive,
-      attempt,
+      0,
       deadline,
-    ), deadline);
+    );
   } catch (error) {
-    const minimumRange = archive ? 1_000 : 250;
     const blockCount = toBlock - fromBlock + 1;
-    if (!canSplitLogRange(error) || blockCount <= minimumRange || depth >= 3) throw error;
+
+    if (
+      !canSplitLogRange(error)
+      || blockCount <= 1
+      || depth >= 8
+    ) throw error;
+
     const midpoint = fromBlock + Math.floor(blockCount / 2) - 1;
-    const left = await getPonsLogsAdaptive(fromBlock, midpoint, archive, depth + 1, deadline);
-    const right = await getPonsLogsAdaptive(midpoint + 1, toBlock, archive, depth + 1, deadline);
+
+    const left = await getPonsLogsAdaptive(
+      fromBlock,
+      midpoint,
+      archive,
+      depth + 1,
+      deadline,
+    );
+
+    const right = await getPonsLogsAdaptive(
+      midpoint + 1,
+      toBlock,
+      archive,
+      depth + 1,
+      deadline,
+    );
+
     return {
-      factoryLogs: [...left.factoryLogs, ...right.factoryLogs],
-      curveLogs: [...left.curveLogs, ...right.curveLogs],
+      factoryLogs: dedupeRpcLogs([
+        ...left.factoryLogs,
+        ...right.factoryLogs,
+      ]),
+      curveLogs: dedupeRpcLogs([
+        ...left.curveLogs,
+        ...right.curveLogs,
+      ]),
       latencyMs: left.latencyMs + right.latencyMs,
-      provider: [...new Set(`${left.provider}+${right.provider}`.split("+"))].join("+"),
+      provider: [...new Set(
+        `${left.provider}+${right.provider}`.split("+")
+      )].join("+"),
       fromBlock,
       toBlock,
     };
@@ -447,46 +760,58 @@ export async function getPonsV1LaunchLogs(
   fromBlock: number,
   toBlock: number,
 ) {
-  if (toBlock < fromBlock || toBlock - fromBlock + 1 > 10_000) throw new Error("pons_v1_launch_range_invalid");
+  if (toBlock < fromBlock || toBlock - fromBlock + 1 > 10_000) {
+    throw new Error("pons_v1_launch_range_invalid");
+  }
+
   const generation = PONS_V1_GENERATIONS[generationId];
-  const { value, provider } = await withProvider(async (candidate) => {
-    const batch = await postBatch(candidate, [{
-      jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
-        address: generation.factory,
-        fromBlock: `0x${fromBlock.toString(16)}`,
-        toBlock: `0x${toBlock.toString(16)}`,
-        topics: [PONS_TOPICS.v1Launch],
-      }],
-    }]);
-    const payload = resultMap(batch.envelopes).get(1);
-    if (!Array.isArray(payload)) throw new Error("invalid_v1_launch_response");
-    const logs = payload.filter(validRpcLog).filter((log) => !log.removed);
-    if (logs.length !== payload.length) throw new Error("invalid_v1_launch_record");
-    return { logs, latencyMs: batch.latencyMs };
-  }, true, Math.floor(fromBlock / 10_000));
-  return { ...value, provider: provider.name, fromBlock, toBlock, generationId };
+
+  const result = await requestLogFiltersAdaptive([{
+    address: generation.factory,
+    topics: [PONS_TOPICS.v1Launch],
+  }], fromBlock, toBlock, true, Math.floor(fromBlock / 10_000));
+
+  return {
+    logs: result.logsByFilter[0] ?? [],
+    latencyMs: result.latencyMs,
+    provider: result.provider,
+    fromBlock,
+    toBlock,
+    generationId,
+  };
 }
 
 export async function getPonsV1SwapLogs(fromBlock: number, toBlock: number, poolAddresses: string[]) {
-  if (toBlock < fromBlock || toBlock - fromBlock + 1 > 2_000) throw new Error("pons_v1_swap_range_invalid");
-  const addresses = [...new Set(poolAddresses.map((address) => address.toLowerCase()))];
-  if (!addresses.length) return { logs: [] as RpcLog[], provider: "none", latencyMs: 0, fromBlock, toBlock };
-  const { value, provider } = await withProvider(async (candidate) => {
-    const batch = await postBatch(candidate, [{
-      jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
-        address: addresses,
-        fromBlock: `0x${fromBlock.toString(16)}`,
-        toBlock: `0x${toBlock.toString(16)}`,
-        topics: [PONS_TOPICS.v3Swap],
-      }],
-    }]);
-    const payload = resultMap(batch.envelopes).get(1);
-    if (!Array.isArray(payload)) throw new Error("invalid_v1_swap_response");
-    const logs = payload.filter(validRpcLog).filter((log) => !log.removed);
-    if (logs.length !== payload.length) throw new Error("invalid_v1_swap_record");
-    return { logs, latencyMs: batch.latencyMs };
-  }, true, Math.floor(fromBlock / 2_000));
-  return { ...value, provider: provider.name, fromBlock, toBlock };
+  if (toBlock < fromBlock || toBlock - fromBlock + 1 > 2_000) {
+    throw new Error("pons_v1_swap_range_invalid");
+  }
+
+  const addresses = [...new Set(
+    poolAddresses.map((address) => address.toLowerCase())
+  )];
+
+  if (!addresses.length) {
+    return {
+      logs: [] as RpcLog[],
+      provider: "none",
+      latencyMs: 0,
+      fromBlock,
+      toBlock,
+    };
+  }
+
+  const result = await requestLogFiltersAdaptive([{
+    address: addresses,
+    topics: [PONS_TOPICS.v3Swap],
+  }], fromBlock, toBlock, true, Math.floor(fromBlock / 2_000));
+
+  return {
+    logs: result.logsByFilter[0] ?? [],
+    latencyMs: result.latencyMs,
+    provider: result.provider,
+    fromBlock,
+    toBlock,
+  };
 }
 
 export async function readPonsTokenMetadata(tokens: Array<{ tokenAddress: string }>) {
