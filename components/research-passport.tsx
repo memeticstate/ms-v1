@@ -9,7 +9,6 @@ import {
   Fingerprint,
   KeyRound,
   LockKeyhole,
-  LogOut,
   RefreshCw,
   ShieldCheck,
   WalletCards,
@@ -50,7 +49,6 @@ export function ResearchPassport({
     walletLinkState,
     signIn,
     linkWallet: linkPrivyWallet,
-    signOut,
     authFetch,
   } = useMemeticAuth();
   const [walletState, setWalletState] = useState<"idle" | "requesting" | "signing" | "linked" | "failed">("idle");
@@ -172,7 +170,14 @@ export function ResearchPassport({
       <div className="grid gap-6 xl:grid-cols-[.82fr_1.18fr]">
         <div className="flex flex-col justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2"><Fingerprint className="size-4 text-culture" /><p className="font-mono text-xs uppercase tracking-[0.18em] text-culture">Research Passport · {entitlements.plan} plan</p><span className="rounded border border-signal/16 bg-signal/[0.03] px-2 py-1 font-mono text-xs uppercase tracking-[0.1em] text-signal">active</span></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Fingerprint className="size-4 text-culture" />
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-culture">Research Passport · {entitlements.plan} plan</p>
+              <span className="rounded border border-culture/18 bg-culture/[0.03] px-2 py-1 font-mono text-xs uppercase tracking-[0.1em] text-culture">passport active</span>
+              <span className={`rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.1em] ${passport.premiumAccess.active ? "border-signal/24 bg-signal/[0.045] text-signal" : "border-attention/24 bg-attention/[0.045] text-attention"}`}>
+                MS holder access · {passport.premiumAccess.active ? "qualified" : passport.premiumAccess.status.replaceAll("_", " ")}
+              </span>
+            </div>
             <h3 className="specimen-serif mt-3 text-4xl leading-[1.04] tracking-[-0.035em] text-foreground/90">{passport.account.displayName}</h3>
             <p className="mt-2 font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{passport.account.email ?? "Wallet-verified identity"} · {usesPrivy ? "secured by Privy" : "Sites account"}</p>
             <p className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground">Your account owns the durable research state. A verified wallet can unlock Premium Interpretation at the 0.1% holder threshold; it never changes facts, scores or rankings.</p>
@@ -181,7 +186,6 @@ export function ResearchPassport({
             <Button type="button" variant="outline" onClick={() => void linkWallet()} disabled={activeWalletState === "requesting" || activeWalletState === "signing"} className="border-culture/24 bg-culture/[0.045] font-mono text-xs uppercase tracking-[0.11em] text-culture hover:bg-culture/[0.08]"><WalletCards />{activeWalletState === "requesting" ? "Opening wallet" : activeWalletState === "signing" ? "Sign ownership proof" : primaryWallet ? "Link another wallet" : "Link wallet"}</Button>
             {primaryWallet ? <Button type="button" variant="outline" onClick={() => void recheckHolder()} disabled={gateState === "checking"} className="border-signal/20 bg-signal/[0.03] font-mono text-xs uppercase tracking-[0.11em] text-signal hover:bg-signal/[0.07]"><ShieldCheck />{gateState === "checking" ? "Checking holder" : "Recheck holder access"}</Button> : null}
             <Button type="button" variant="outline" onClick={() => void syncWatches()} disabled={!localWatchCount || syncState === "syncing"} className="border-signal/18 bg-signal/[0.03] font-mono text-xs uppercase tracking-[0.11em] text-signal hover:bg-signal/[0.065]"><Bookmark />{syncState === "syncing" ? "Syncing field notes" : `Sync ${localWatchCount} device watch${localWatchCount === 1 ? "" : "es"}`}</Button>
-            {usesPrivy ? <Button type="button" variant="ghost" onClick={() => void signOut()} className="font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground hover:text-foreground/68"><LogOut />Sign out</Button> : null}
           </div>
           <div className="mt-3 min-h-5 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground">
             {activeWalletState === "failed" ? "Wallet link failed or was cancelled. No transaction was sent." : activeWalletState === "linked" ? "Wallet ownership verified and synced by Privy." : primaryWallet ? `Primary wallet ${short(primaryWallet.address)} · Robinhood Chain ${primaryWallet.chainId}` : usesPrivy ? "Privy ownership proof · no transaction · no spend approval" : "Wallet signature only · no transaction · no spend approval"}

@@ -7,7 +7,9 @@
   "workers_dev": true,
   "vars": {
     "MEMETIC_AUTH_MODE": "privy",
-    "PRIVY_APP_ID": "cmtp72a3700070bl79bfbeliw"
+    "PRIVY_APP_ID": "cmtp72a3700070bl79bfbeliw",
+    "MEMETIC_TOKEN_ENTITLEMENTS_ENABLED": "true",
+    "MEMETIC_TOKEN_CONTRACT_ADDRESS": "0xeDf1AC25ff0CF741A9eE1490C630E3a4eCfBd4FC"
   },
   "d1_databases": [
     {

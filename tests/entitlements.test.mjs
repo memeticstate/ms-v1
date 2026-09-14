@@ -187,10 +187,12 @@ test("Privy rollout is explicit, fail-closed, and keeps bearer tokens out of per
 });
 
 test("Privy wallet-first UX and private operator ledger are wired without gating public research", async () => {
-  const [provider, passport, adminRoute] = await Promise.all([
+  const [provider, passport, headerWallet, adminRoute, wrangler] = await Promise.all([
     readFile(path.join(root, "components/memetic-auth-provider.tsx"), "utf8"),
     readFile(path.join(root, "components/research-passport.tsx"), "utf8"),
+    readFile(path.join(root, "components/header-wallet.tsx"), "utf8"),
     readFile(path.join(root, "app/api/admin/members/route.ts"), "utf8"),
+    readFile(path.join(root, "wrangler.jsonc"), "utf8"),
   ]);
   assert.match(provider, /PrivyProvider/);
   assert.match(provider, /showWalletLoginFirst: true/);
@@ -199,6 +201,14 @@ test("Privy wallet-first UX and private operator ledger are wired without gating
   assert.match(provider, /Authorization|authorization/);
   assert.match(passport, /Open with wallet or email/);
   assert.match(passport, /secured by Privy/);
+  assert.match(passport, /passport active/);
+  assert.match(passport, /MS holder access/);
+  assert.doesNotMatch(passport, /<LogOut \/>Sign out/);
+  assert.match(headerWallet, /Research Passport/);
+  assert.match(headerWallet, /Link another wallet/);
+  assert.match(headerWallet, /Sign out/);
+  assert.match(wrangler, /"MEMETIC_TOKEN_ENTITLEMENTS_ENABLED"\s*:\s*"true"/);
+  assert.match(wrangler, /"MEMETIC_TOKEN_CONTRACT_ADDRESS"\s*:\s*"0xeDf1AC25ff0CF741A9eE1490C630E3a4eCfBd4FC"/);
   assert.match(adminRoute, /memberIsAdmin/);
   assert.match(adminRoute, /MEMETIC_ADMIN_IDENTITIES|admin_access_required/);
 });
