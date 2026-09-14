@@ -179,6 +179,8 @@ test("indexes PONS from canonical logs with finality, reorg rewind, and independ
   assert.match(indexer, /rewindPonsIndex/);
   assert.match(indexer, /clearPonsStagedRange/);
   assert.match(indexer, /historical-backfill/);
+  assert.match(indexer, /historicalErrorCode/);
+  assert.match(indexer, /historyDeadline/);
   assert.match(indexer, /metadataErrorCode/);
   assert.match(rpc, /eth_getLogs/);
   assert.match(rpc, /PONS_V2_FACTORY/);

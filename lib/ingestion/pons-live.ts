@@ -117,26 +117,46 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
     let backfillNext = Math.max(PONS_V2_DEPLOYMENT_FLOOR, state.backfill_next_block);
     const historicalFrom = backfillNext;
     let historicalTo: number | null = null;
+    let historicalErrorCode: string | null = null;
     const historyCeiling = Math.max(PONS_V2_DEPLOYMENT_FLOOR - 1, liveFrom - 1);
+
+    // Historical memory is opportunistic. Never allow it to invalidate a
+    // successfully fetched and persisted live edge. Reserve RPC time for the
+    // canonical commit and leave the backfill cursor unchanged on failure.
+    const historyDeadline = rpcDeadline - 2_000;
     if (budget.backfillBlocks > 0 && backfillNext <= historyCeiling) {
       const historyTo = Math.min(historyCeiling, backfillNext + budget.backfillBlocks - 1);
-      historicalTo = historyTo;
       const historyRanges = ranges(backfillNext, historyTo, 10_000);
       await updateRunPhase(run.id, phase, {
         strategy: budget.strategy, fromBlock: backfillNext, toBlock: historyTo, chunks: historyRanges.length,
       });
-      const historicalBatches = await Promise.all(historyRanges.map((range) => getPonsLogs(range.fromBlock, range.toBlock, true, rpcDeadline)));
-      for (const historical of historicalBatches.sort((left, right) => left.fromBlock - right.fromBlock)) {
-        const persisted = await persistPonsLogs({
-          factoryLogs: historical.factoryLogs,
-          curveLogs: historical.curveLogs,
-          fallbackTimestamp: head.timestamp,
-        });
-        launchCount += persisted.launches;
-        lifecycleCount += persisted.lifecycleEvents;
-        tradeCount += persisted.trades;
+
+      if (Date.now() >= historyDeadline) {
+        historicalErrorCode = "history_budget_exhausted";
+      } else {
+        try {
+          const historicalBatches = await Promise.all(
+            historyRanges.map((range) => getPonsLogs(range.fromBlock, range.toBlock, true, historyDeadline)),
+          );
+          for (const historical of historicalBatches.sort((left, right) => left.fromBlock - right.fromBlock)) {
+            const persisted = await persistPonsLogs({
+              factoryLogs: historical.factoryLogs,
+              curveLogs: historical.curveLogs,
+              fallbackTimestamp: head.timestamp,
+            });
+            launchCount += persisted.launches;
+            lifecycleCount += persisted.lifecycleEvents;
+            tradeCount += persisted.trades;
+          }
+          historicalTo = historyTo;
+          backfillNext = historyTo + 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "history_backfill_unavailable";
+          historicalErrorCode = /^[a-zA-Z0-9_:-]{1,80}$/.test(message)
+            ? message
+            : "history_backfill_unavailable";
+        }
       }
-      backfillNext = historyTo + 1;
     }
 
     phase = "commit";
@@ -167,6 +187,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       historicalFrom: historicalTo === null ? null : historicalFrom,
       historicalTo,
       historicalBlocksProcessed,
+      historicalErrorCode,
       recordCount,
       metadataRequested: 0,
       metadataResolved,
@@ -193,6 +214,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
         strategy: budget.strategy,
         liveBlocksProcessed,
         historicalBlocksProcessed,
+        historicalErrorCode,
         metadataErrorCode,
       },
     });
@@ -201,7 +223,9 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       discoveredSpecies: launchCount,
       observedSpecies: launchCount,
       verifiedSpecies: lifecycleCount,
-      warningCount: (safeHead - latestProcessed > LOG_CHUNK_BLOCKS ? 1 : 0) + (metadataErrorCode ? 1 : 0),
+      warningCount: (safeHead - latestProcessed > LOG_CHUNK_BLOCKS ? 1 : 0)
+        + (metadataErrorCode ? 1 : 0)
+        + (historicalErrorCode ? 1 : 0),
       metadata: runMetadata,
     });
     await resolveEngineAlert("pons_collection_failed", "collector", "pons-v2").catch(() => undefined);
@@ -217,6 +241,7 @@ export async function runPonsCollection(trigger: CollectionTrigger, options: { f
       strategy: budget.strategy,
       liveBlocksProcessed,
       historicalBlocksProcessed,
+      historicalErrorCode,
     };
   } catch (error) {
     await markPonsIndexFailure(error).catch(() => undefined);
