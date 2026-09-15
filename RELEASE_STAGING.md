@@ -1,13 +1,20 @@
-# Memetic State: Simple experience staging review
+# Memetic State: Simple v63 staging review
 
 Base: `infra/cloudflare-staging-v62` at `e4d30bc6eefe65b370cdb4df5ac32a26ac5d84fc`.
 Review branch: `work/simple-experience-v62`. Target: `infra/cloudflare-staging-v62`.
 
 The Simple v62 redesign was merged in PR #2 at `3489a483bd9fa0061a8dc8cfdadc75823103f30c` and deployed by the owner to `memetic-state-staging`. Wrangler reported version `313ac889-7414-41c0-85f8-59af3af6aad1` on 2026-09-15. Production has not been cut over.
 
-This v62.1 follow-up fixes a live review finding: a recorded transition could describe historical eligibility as if it were the current reading. Token Brief and the Observatory now explicitly distinguish recorded state from current state and prefer current research guidance. This follow-up is locally verified and awaits staging deployment.
+The v63 follow-up responds to design review: Simple and Token Brief now use neutral charcoal surfaces, stronger token identities, clear sans-serif hierarchy, rounded controls and restrained semantic accents. Simple supports cards and compact lists. The shared header has a refined desktop navigation and a mobile dock, and Token Brief groups actions, metric tiles, exact latest/prior participation comparisons, current guidance and dated changes.
+
+This includes the v62.1 correction: a recorded transition is explicitly distinguished from the current reading, with current research guidance taking precedence. The v63 follow-up is locally verified and awaits staging deployment.
 
 ## Release ledger
+
+- v63 visual refinement: neutral dark and light surfaces, clearer typography, larger token identity, card/list layouts and revised desktop/mobile navigation.
+- v63 interaction refinement: keyboard tab navigation, visible mobile refresh, retained list timestamps, accessible Field Guide link and larger touch targets.
+- v63 Token Brief: primary actions near identity, four metric cards, exact latest/prior indexed trade comparison, clear recorded/current state separation and compact evidence drawers.
+- CHANGED reuses available artwork by matching contract identity only; recorded states and metrics retain their existing semantics.
 
 - Implemented: default `/app` with NOW, CHANGED and NEW, token search, and desktop/mobile navigation.
 - Implemented: `/app/token/[address]` Token Brief with deterministic state, dated transition, trades, actors, trade activity versus prior window, current sampled holders, source coverage, and progressive evidence disclosure.
@@ -54,13 +61,17 @@ The RPC collector, deterministic classifier, D1 schema, production hosting confi
 
 ## Remaining release gates
 
-1. Deploy and review the v62.1 presentation follow-up on `memetic-state-staging` only.
+1. Deploy and review the v63 design follow-up on `memetic-state-staging` only.
 2. Review approximately 390px mobile layouts, tap targets, drawers and scrolling.
 3. Complete Privy wallet/email/Google login, below-threshold denial, 0.1% holder access, access expiry/refresh, Research and authenticated Save/account restore.
 4. Compare deterministic readings against canonical evidence for identical tokens and observation blocks through an authorized client.
 5. Finish collector freshness and persistent state-memory soak; UI spot checks alone do not establish continuous health.
 6. Verify explorer destinations in authenticated saved research and wallet UI.
 
-The staging-only portable package passed Wrangler 4.132.0 dry run. No database migration, dependency change, RPC transport change, classifier change or production-domain configuration change is included.
+The preceding portable package passed Wrangler 4.132.0 dry run. The v63 package is rebuilt from the tested source before delivery. No database migration, dependency change, RPC transport change, classifier change or production-domain configuration change is included.
 
 `memeticstate.com`, its DNS and the existing ChatGPT Sites production remain outside this release. Production-domain cutover is a separate later decision after the checks above pass.
+
+## v63 design preview
+
+An offline review file renders NOW, CHANGED, NEW and Token Brief from the updated components and their styles, with a 390px mode, card/list switching and light/dark control. It uses illustrative fixtures and cannot validate live data, wallet sign-in or API behavior. It is a design preview, not a screenshot or browser test of the deployed Worker.

@@ -1,0 +1,172 @@
+.header,
+.mobileNav {
+  --nav-bg: #0c0e10;
+  --nav-surface: #15181b;
+  --nav-hover: #202428;
+  --nav-active: #292e32;
+  --nav-text: #f1f2ee;
+  --nav-secondary: #8e959b;
+  --nav-line: rgb(255 255 255 / 8%);
+  --nav-highlight: rgb(255 255 255 / 13%);
+  --nav-sage: #a1b495;
+  --nav-wallet: #e4e7df;
+  --nav-wallet-text: #161b18;
+  color: var(--nav-text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:global(.light) .header,
+:global(.light) .mobileNav {
+  --nav-bg: #f5f6f4;
+  --nav-surface: #e9ece8;
+  --nav-hover: #e0e5df;
+  --nav-active: #fff;
+  --nav-text: #181e1d;
+  --nav-secondary: #666f6b;
+  --nav-line: rgb(23 32 28 / 9%);
+  --nav-highlight: rgb(23 32 28 / 13%);
+  --nav-sage: #627b55;
+  --nav-wallet: #202923;
+  --nav-wallet-text: #f3f5ef;
+}
+
+.header {
+  position: relative;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  min-height: 80px;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 12px 36px;
+  border-bottom: 1px solid var(--nav-line);
+  background: var(--nav-bg);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--nav-text);
+  text-decoration: none;
+}
+
+.brandSymbol { display: grid; place-items: center; width: 38px; height: 42px; }
+.brandMark { --glyph-frame: #b5a276; --glyph-route: #96ab8f; --glyph-node: #a7aea2; --glyph-branch: var(--nav-text); width: 32px; height: 32px; }
+.wordmark { font-size: 17px; line-height: 1; font-weight: 650; letter-spacing: -.045em; white-space: nowrap; }
+.wordmark > span { color: var(--nav-secondary); font-weight: 500; }
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--nav-line);
+  border-radius: 999px;
+  background: var(--nav-surface);
+}
+
+.desktopNav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--nav-secondary);
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: -.01em;
+  text-decoration: none;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.desktopNav a:hover { background: var(--nav-hover); color: var(--nav-text); }
+.desktopNav a[aria-current='page'] { border-color: var(--nav-highlight); background: var(--nav-active); color: var(--nav-text); box-shadow: 0 2px 5px rgb(0 0 0 / 9%); }
+.desktopNav a[aria-current='page'] svg { color: var(--nav-sage); }
+.headerActions { display: flex; align-items: center; flex-shrink: 0; gap: 10px; }
+.iconButton { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--nav-line); border-radius: 50%; background: transparent; color: var(--nav-secondary); cursor: pointer; transition: color 140ms ease, background 140ms ease; }
+.iconButton:hover { background: var(--nav-surface); color: var(--nav-text); }
+.sunIcon { display: block; }
+.moonIcon { display: none; }
+:global(.light) .sunIcon { display: none; }
+:global(.light) .moonIcon { display: block; }
+.walletWrap { position: relative; }
+.walletButton { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 0 16px; border: 1px solid transparent; border-radius: 999px; background: var(--nav-wallet); color: var(--nav-wallet-text); font-size: 12px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; cursor: pointer; transition: filter 140ms ease, border-color 140ms ease, background 140ms ease; }
+.walletButton:hover:not(:disabled) { filter: brightness(1.06); }
+.walletButton[data-authenticated='true'] { border-color: var(--nav-highlight); background: var(--nav-surface); color: var(--nav-text); }
+.walletButton[data-authenticated='true']:hover { background: var(--nav-hover); }
+.walletButton:disabled { opacity: .55; cursor: default; }
+.walletChevron { color: var(--nav-secondary); transition: transform 140ms ease; }
+.walletButton[aria-expanded='true'] .walletChevron { transform: rotate(180deg); }
+.mobileWalletLabel { display: none; }
+
+.accountMenu { position: absolute; top: calc(100% + 10px); right: 0; width: 244px; padding: 7px; border: 1px solid var(--nav-highlight); border-radius: 16px; background: var(--nav-surface); box-shadow: 0 18px 50px rgb(0 0 0 / 26%); }
+.accountHeading { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 4px 11px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--nav-line); color: var(--nav-secondary); font-size: 11px; letter-spacing: .015em; }
+.accountDot { width: 5px; height: 5px; border-radius: 50%; background: var(--nav-sage); }
+.accountMenu a,
+.accountMenu button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 11px; border-radius: 9px; color: var(--nav-text); font-size: 12px; font-weight: 500; text-decoration: none; text-align: left; cursor: pointer; }
+.accountMenu a > span,
+.accountMenu button > span { flex: 1; }
+.accountMenu a > svg,
+.accountMenu button > svg { flex-shrink: 0; color: var(--nav-secondary); }
+.accountMenu a:hover,
+.accountMenu button:hover { background: var(--nav-hover); }
+.accountMenu .signOut { margin-top: 4px; border-top: 1px solid var(--nav-line); border-radius: 0 0 9px 9px; color: var(--nav-secondary); }
+.mobileNav { display: none; }
+.header :where(a, button):focus-visible,
+.mobileNav a:focus-visible { outline: 2px solid var(--nav-sage); outline-offset: 4px; }
+
+@media (max-width: 1100px) {
+  .header { gap: 16px; padding-inline: 24px; }
+  .desktopNav a { gap: 6px; padding-inline: 12px; }
+  .wordmark { font-size: 16px; }
+  .headerActions { gap: 8px; }
+}
+
+@media (max-width: 900px) and (min-width: 761px) {
+  .desktopNav a { width: 44px; padding-inline: 0; }
+  .desktopNav a > span { display: none; }
+}
+
+@media (max-width: 760px) {
+  .header { min-height: 72px; padding: 12px 20px; }
+  .desktopNav { display: none; }
+  .mobileNav { position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; padding: 8px max(14px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); border-top: 1px solid var(--nav-highlight); background: color-mix(in srgb, var(--nav-bg) 95%, transparent); box-shadow: 0 -8px 32px rgb(0 0 0 / 12%); backdrop-filter: blur(20px); }
+  .mobileNav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 52px; border: 1px solid transparent; border-radius: 13px; color: var(--nav-secondary); font-size: 10px; font-weight: 550; letter-spacing: -.01em; text-decoration: none; transition: color 140ms ease, background 140ms ease; }
+  .mobileNav a[aria-current='page'] { border-color: var(--nav-line); background: var(--nav-active); color: var(--nav-text); }
+  .mobileNav a[aria-current='page'] svg { color: var(--nav-sage); }
+  .mobileNav a:hover { background: var(--nav-surface); color: var(--nav-text); }
+}
+
+@media (max-width: 540px) {
+  .header { padding-inline: 16px; gap: 10px; }
+  .brand { gap: 7px; }
+  .brandSymbol { width: 30px; }
+  .brandMark { width: 29px; height: 29px; }
+  .wordmark { font-size: 15px; }
+  .headerActions { gap: 6px; }
+  .walletButton { padding-inline: 12px; gap: 7px; }
+  .desktopWalletLabel { display: none; }
+  .mobileWalletLabel { display: inline; }
+}
+
+@media (max-width: 360px) {
+  .header { padding-inline: 12px; gap: 6px; }
+  .wordmark { font-size: 14px; }
+  .brand { gap: 5px; }
+  .walletButton { padding-inline: 10px; gap: 6px; }
+  .mobileWalletLabel { max-width: 54px; overflow: hidden; text-overflow: ellipsis; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header *, .mobileNav * { transition: none; }
+}
