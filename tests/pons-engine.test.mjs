@@ -547,3 +547,23 @@ test("transition explanations distinguish inactivity and surface stress reasons"
   );
   assert.match(researchDb, /payloadStrings\(after, "researchReasons"\)/);
 });
+
+
+test("launch dossier exposes persistent token state changes without overstating recovery", async () => {
+  const observatory = await readFile(
+    new URL("../components/pons-observatory.tsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(observatory, /function TokenStateTransition/);
+  assert.ok(
+    observatory.includes("launch.stateTransition")
+  );
+  assert.match(observatory, /State change/);
+  assert.match(observatory, /What changed/);
+  assert.match(observatory, /Watch next/);
+  assert.match(observatory, /not yet a verified recovery/);
+  assert.ok(
+    observatory.includes("<TokenStateTransition launch={launch} />")
+  );
+});

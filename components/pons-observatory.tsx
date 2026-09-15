@@ -566,6 +566,88 @@ function ScoreRing({ score, color }: { score: number | null; color: string }) {
   );
 }
 
+function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
+  const transition = launch.stateTransition;
+  if (!transition) return null;
+
+  const tone =
+    transition.kind === "recovered" || transition.kind === "strengthened"
+      ? "var(--signal)"
+      : transition.kind === "deteriorated" || transition.kind === "inactive"
+        ? "var(--danger)"
+        : transition.kind === "stress-cleared"
+          ? "var(--attention)"
+          : "var(--culture)";
+
+  return (
+    <section
+      aria-label="Token state change"
+      className="mt-5 overflow-hidden rounded border border-foreground/10 bg-foreground/[0.022]"
+    >
+      <div
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/8 px-4 py-3"
+        style={{ borderLeft: `2px solid ${tone}` }}
+      >
+        <div>
+          <p
+            className="font-mono text-xs uppercase tracking-[0.17em]"
+            style={{ color: tone }}
+          >
+            State change
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground/85">
+            {transition.label}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">
+            {transition.from} → {transition.to}
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {relativeTime(transition.observedAt)}
+          </p>
+        </div>
+      </div>
+
+      <div className="px-4 py-4">
+        {transition.kind === "stress-cleared" ? (
+          <div className="mb-4 rounded border border-attention/15 bg-attention/[0.035] px-3 py-2.5 text-xs leading-5 text-foreground/70">
+            The previously measured stress condition is no longer confirmed.
+            This is <strong className="font-semibold text-attention">not yet a verified recovery</strong>.
+          </div>
+        ) : null}
+
+        <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
+          What changed
+        </p>
+
+        <ul className="mt-2.5 space-y-2">
+          {transition.whatChanged.map((item) => (
+            <li key={item} className="flex gap-2 text-xs leading-5 text-foreground/72">
+              <span
+                aria-hidden="true"
+                className="mt-[0.55em] size-1 shrink-0 rounded-full"
+                style={{ backgroundColor: tone }}
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-4 border-t border-foreground/8 pt-3">
+          <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
+            Watch next
+          </p>
+          <p className="mt-2 text-xs leading-5 text-foreground/65">
+            {transition.watchNext}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LaunchDossier({ launch, saved, onToggleSave }: {
   launch: PonsLaunchView | null;
   saved: boolean;
@@ -599,6 +681,8 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
         </div>
         <ScoreRing score={launch.research?.score ?? null} color={scoreTone(launch.attentionScore)} />
       </div>
+
+      <TokenStateTransition launch={launch} />
 
       <Button type="button" variant="outline" size="sm" onClick={() => onToggleSave(launch)}
         className={`mt-4 w-full justify-center font-mono text-xs uppercase tracking-[0.11em] ${saved ? "border-signal/20 bg-signal/[0.035] text-signal hover:bg-signal/[0.06]" : "border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:border-attention/25 hover:text-attention"}`}>
