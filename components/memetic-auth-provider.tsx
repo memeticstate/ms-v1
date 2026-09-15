@@ -1,5 +1,7 @@
 "use client";
 
+import { ROBINHOOD_EXPLORER } from "@/lib/robinhood-explorer";
+
 import {
   PrivyProvider,
   useLinkAccount,
@@ -41,7 +43,7 @@ const robinhoodChain = defineChain({
     default: { http: ["https://rpc.mainnet.chain.robinhood.com"] },
   },
   blockExplorers: {
-    default: { name: "Robinhood Chain Explorer", url: "https://robinhoodchain.blockscout.com" },
+    default: { name: "Robinhood Etherscan", url: ROBINHOOD_EXPLORER },
   },
 });
 

@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Memetic State — PONS Observatory",
+  title: "Memetic State — The present, with context",
   description:
     "Independent attention intelligence for PONS launches and tokenized-stock habitats on Robinhood Chain.",
   icons: {

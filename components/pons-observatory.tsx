@@ -1,5 +1,7 @@
 "use client";
 
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
@@ -33,22 +35,18 @@ import {
   ScanLine,
   ShieldCheck,
   Sparkles,
-  Sun,
   TimerReset,
   Users,
-  Moon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 
-import { StateGlyph } from "@/components/state-glyph";
+import { AppHeader } from "@/components/app-header";
 import { FieldGuide, GuidedReading } from "@/components/field-guide";
 import { useMemeticAuth } from "@/components/memetic-auth-provider";
 import { ResearchPassport } from "@/components/research-passport";
 import { TokenSearch } from "@/components/token-search";
 import { TokenAvatar } from "@/components/token-avatar";
 import { TokenOverview } from "@/components/token-overview";
-import { tokenAddress, tokenText, tokenTitle, type TokenSearchResult } from "@/lib/tokens/model";
-import { HeaderWallet } from "@/components/header-wallet";
+import { tokenText, tokenTitle, type TokenSearchResult } from "@/lib/tokens/model";
 import { ProtocolCoveragePanel } from "@/components/protocol-coverage";
 import { PulseEvidence } from "@/components/pulse-evidence";
 import { FactoryActivity } from "@/components/factory-activity";
@@ -60,6 +58,7 @@ import { WatchlistPanel } from "@/components/watchlist-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { launchesForPair, pairSelection, selectedLaunch } from "@/lib/pons/navigation";
+import { appTokenHref, parseObservatoryLocation, type ObservatoryExperience, type ObservatoryView } from "@/lib/app-navigation";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,6 +70,7 @@ import type {
   PonsPulseMetric,
   PonsStateResponse,
   PonsTapeEvent,
+  PonsTokenStateTransition,
 } from "@/lib/pons/model";
 import type { PassportResponse } from "@/lib/entitlements/client";
 import { downloadPulseCard } from "@/lib/pons/pulse-card";
@@ -389,14 +389,14 @@ function ProtocolHistoryPanel({ state }: { state: PonsStateResponse }) {
         <div className="grid gap-px bg-foreground/10 lg:grid-cols-2">
           {history.generations.map((generation) => {
             const healthy = generation.consecutiveFailures === 0;
-            return <article key={generation.id} data-generation={generation.id} className="bg-[var(--surface-2)] p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs uppercase tracking-[0.14em] text-attention">{generation.id === "v1-current" ? "Current V1" : "Legacy V1"}</p><p className="mt-1 text-xs text-muted-foreground">Uniswap V3 launch + pool activity</p></div><span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.1em]" style={{ color: healthy ? "var(--signal)" : "var(--danger)", borderColor: healthy ? "color-mix(in srgb, var(--signal) 25%, transparent)" : "color-mix(in srgb, var(--danger) 25%, transparent)" }}>{healthy ? "reconciled" : `${generation.consecutiveFailures} failures`}</span></div><div className="mt-5 grid grid-cols-2 gap-4"><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Launch discovery</span><span>{generation.launchProgress.toFixed(1)}%</span></div><Progress value={generation.launchProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-attention" /></div><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Swap history</span><span>{generation.swapProgress.toFixed(1)}%</span></div><Progress value={generation.swapProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-culture" /></div></div><div className="mt-5 flex items-center justify-between border-t border-foreground/[0.07] pt-3 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground"><span>{integer.format(generation.launches)} launches · {integer.format(generation.swaps)} swaps</span><a href={`https://robinhoodchain.blockscout.com/address/${generation.factory}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-attention">factory <ExternalLink className="size-2.5" /></a></div></article>;
+            return <article key={generation.id} data-generation={generation.id} className="bg-[var(--surface-2)] p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs uppercase tracking-[0.14em] text-attention">{generation.id === "v1-current" ? "Current V1" : "Legacy V1"}</p><p className="mt-1 text-xs text-muted-foreground">Uniswap V3 launch + pool activity</p></div><span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.1em]" style={{ color: healthy ? "var(--signal)" : "var(--danger)", borderColor: healthy ? "color-mix(in srgb, var(--signal) 25%, transparent)" : "color-mix(in srgb, var(--danger) 25%, transparent)" }}>{healthy ? "reconciled" : `${generation.consecutiveFailures} failures`}</span></div><div className="mt-5 grid grid-cols-2 gap-4"><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Launch discovery</span><span>{generation.launchProgress.toFixed(1)}%</span></div><Progress value={generation.launchProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-attention" /></div><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Swap history</span><span>{generation.swapProgress.toFixed(1)}%</span></div><Progress value={generation.swapProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-culture" /></div></div><div className="mt-5 flex items-center justify-between border-t border-foreground/[0.07] pt-3 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground"><span>{integer.format(generation.launches)} launches · {integer.format(generation.swaps)} swaps</span><a href={robinhoodExplorer.address(generation.factory)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-attention">factory <ExternalLink className="size-2.5" /></a></div></article>;
           })}
         </div>
       </section>
       <section className="overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/86">
         <div className="flex items-center justify-between gap-4 border-b border-foreground/10 px-4 py-3 sm:px-5"><div><p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">V1 launch ledger</p><p className="mt-1 text-caption text-muted-foreground">Most recent committed launches across both canonical factories</p></div><span className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">finality {history.finalityBlocks} blocks</span></div>
         <Button variant="outline" className="m-3" onClick={() => setAscending(!ascending)}>{ascending ? "Oldest first ↑" : "Newest first ↓"}</Button>
-        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><p className="font-medium text-foreground/70">{launch.symbol || short(launch.tokenAddress)}</p><p className="mt-0.5 font-mono text-xs text-muted-foreground">{launch.name || short(launch.tokenAddress)}</p></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={`https://robinhoodchain.blockscout.com/tx/${launch.txHash}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
+        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><p className="font-medium text-foreground/70">{launch.symbol || short(launch.tokenAddress)}</p><p className="mt-0.5 font-mono text-xs text-muted-foreground">{launch.name || short(launch.tokenAddress)}</p></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={robinhoodExplorer.tx(launch.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
       </section>
     </div>
   );
@@ -676,7 +676,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
           </div>
           <h2 className="specimen-serif mt-4 break-words text-4xl tracking-[-0.035em] text-foreground/92">{launch.symbol === "—" ? "Token" : launch.symbol}</h2>
           <p className="mt-1 text-sm text-foreground/60">{launch.name}</p>
-          <a href={`https://robinhoodchain.blockscout.com/address/${launch.tokenAddress}`} target="_blank" rel="noreferrer" className="mt-2 inline-block font-mono text-xs underline text-foreground/65">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a>
+          <a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" className="mt-2 inline-block font-mono text-xs underline text-foreground/65">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a>
           <a href={`https://www.ponsfamily.com/launchpad/${launch.tokenAddress}`} target="_blank" rel="noreferrer" className="ml-3 text-xs underline text-attention">PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a>
         </div>
         <ScoreRing score={launch.research?.score ?? null} color={scoreTone(launch.attentionScore)} />
@@ -735,7 +735,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
           <div className="dossier-cell"><strong>{launch.deployerGraduations}</strong><span>graduated</span></div>
           <div className="dossier-cell"><strong>#{integer.format(launch.blockNumber)}</strong><span>birth block</span></div>
         </div>
-        <a href={`https://robinhoodchain.blockscout.com/address/${launch.deployerAddress}`} target="_blank" rel="noreferrer"
+        <a href={robinhoodExplorer.address(launch.deployerAddress)} target="_blank" rel="noreferrer"
           className="mt-3 flex items-center justify-between gap-3 rounded border border-foreground/8 bg-foreground/[0.025] px-3 py-2 font-mono text-xs text-muted-foreground transition hover:border-foreground/15 hover:text-muted-foreground">
           <span className="truncate">deployer {short(launch.deployerAddress)}</span><ExternalLink className="size-3" />
         </a>
@@ -759,8 +759,8 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
       </div>
 
       <div className="mt-5 space-y-2 border-t border-foreground/10 pt-4 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">
-        <a href={`https://robinhoodchain.blockscout.com/address/${launch.tokenAddress}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">token {launch.tokenAddress}</span><ExternalLink className="size-3" /></a>
-        <a href={`https://robinhoodchain.blockscout.com/address/${launch.curveAddress}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">curve {launch.curveAddress}</span><ExternalLink className="size-3" /></a>
+        <a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">token {launch.tokenAddress}</span><ExternalLink className="size-3" /></a>
+        <a href={robinhoodExplorer.address(launch.curveAddress)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">curve {launch.curveAddress}</span><ExternalLink className="size-3" /></a>
         <span className="flex items-center justify-between gap-3"><span>config {launch.launchConfigId} · born {relativeTime(launch.launchedAt)}</span><ShieldCheck className="size-3 text-signal" /></span>
       </div>
     </aside>
@@ -808,7 +808,7 @@ function TokenIdentity({ launch }: { launch: PonsLaunchView }) {
   return <div className="flex items-center gap-3">
     <a href={`https://www.ponsfamily.com/launchpad/${launch.tokenAddress}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Open this token on PONS" aria-label={`Open ${launch.symbol} on PONS`} className="shrink-0"><TokenAvatar token={launch} className="grid size-10 place-items-center overflow-hidden rounded border border-foreground/15 bg-signal/10 font-mono text-xs text-attention" /></a>
     <div className="min-w-0"><p className="truncate text-sm"><strong>{tokenTitle(launch)}</strong> <span className="text-muted-foreground">{tokenText(launch.name)}</span></p>
-    <p className="mt-1 font-mono text-caption text-muted-foreground"><a href={`https://robinhoodchain.blockscout.com/address/${launch.tokenAddress}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="underline hover:text-foreground">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a> · {quoteAssetLabel(launch.pairSymbol)}</p></div>
+    <p className="mt-1 font-mono text-caption text-muted-foreground"><a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="underline hover:text-foreground">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a> · {quoteAssetLabel(launch.pairSymbol)}</p></div>
   </div>;
 }
 
@@ -907,7 +907,7 @@ function PonsTape({ events, onInspect, state }: { events: PonsTapeEvent[]; onIns
             <article key={event.id} className="grid gap-3 px-4 py-3.5 transition hover:bg-foreground/[0.02] sm:grid-cols-[115px_minmax(0,1fr)_140px] sm:items-center">
               <div className="flex items-center gap-2"><span className="size-1.5 rounded-full" style={{ backgroundColor: eventColor[event.eventType] }} /><span className="font-mono text-xs uppercase tracking-[0.14em]" style={{ color: eventColor[event.eventType] }}>{event.eventType}</span></div>
               <button type="button" onClick={() => onInspect(event.tokenAddress)} aria-label={`Inspect ${event.tokenSymbol === "—" ? short(event.tokenAddress) : event.tokenSymbol} evidence`} className="min-w-0 text-left hover:underline"><p className="truncate text-sm text-foreground/70"><strong className="font-mono text-caption text-foreground/90">{event.tokenSymbol}</strong> <span className="text-muted-foreground">{event.detail}</span></p><p className="mt-1 truncate font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">{quoteAssetLabel(event.pairSymbol)} · token {short(event.tokenAddress)}</p></button>
-              <a href={`https://robinhoodchain.blockscout.com/tx/${event.txHash}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:text-muted-foreground sm:justify-end"><span>#{integer.format(event.blockNumber)} · {relativeTime(event.observedAt)}</span><ExternalLink className="size-3" /></a>
+              <a href={robinhoodExplorer.tx(event.txHash)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:text-muted-foreground sm:justify-end"><span>#{integer.format(event.blockNumber)} · {relativeTime(event.observedAt)}</span><ExternalLink className="size-3" /></a>
             </article>
           ))}
         </div>
@@ -1041,7 +1041,7 @@ function EvidencePanel({ state, onWake, wakeState }: {
           <div className="mt-4 space-y-3">
             {state.methodology.caveats.map((caveat) => <p key={caveat} className="flex gap-3 text-xs leading-5 text-muted-foreground"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-signal/60" />{caveat}</p>)}
           </div>
-          <a href={`https://robinhoodchain.blockscout.com/address/${state.index.factory}`} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-between gap-3 rounded border border-foreground/8 bg-foreground/[0.025] px-3 py-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:border-foreground/15 hover:text-muted-foreground"><span>Inspect canonical PONS V2 factory</span><ExternalLink className="size-3" /></a>
+          <a href={robinhoodExplorer.address(state.index.factory)} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-between gap-3 rounded border border-foreground/8 bg-foreground/[0.025] px-3 py-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:border-foreground/15 hover:text-muted-foreground"><span>Inspect canonical PONS V2 factory</span><ExternalLink className="size-3" /></a>
         </div>
       </section>
     </div>
@@ -1158,16 +1158,12 @@ function NetworkPanel({ state, passport, localWatchCount, windowBlocks, onOpenSi
   );
 }
 
-type ObservatoryView = "signals" | "atlas" | "watchlist" | "tape" | "history" | "evidence" | "network" | "premium";
-
-export function PonsObservatory() {
-  const { resolvedTheme, setTheme } = useTheme();
+export function PonsObservatory({ experience = "observe" }: { experience?: ObservatoryExperience }) {
   const {
     authenticated: privyAuthenticated,
     identityVersion,
     authFetch,
   } = useMemeticAuth();
-  const [themeReady, setThemeReady] = useState(false);
   const [state, setState] = useState<PonsStateResponse | null>(null);
   const factoryStream = useFactoryStream(state?.factoryLive);
   const [activePair, setActivePair] = useState("ALL");
@@ -1179,11 +1175,13 @@ export function PonsObservatory() {
   const [signalFilter, setSignalFilter] = useState<SignalFilter>("active");
   const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>("all");
   const [signalSort, setSignalSort] = useState<SignalSort>("attention");
-  const [activeView, setActiveView] = useState<ObservatoryView>("signals");
+  const [activeView, setActiveView] = useState<ObservatoryView>(experience === "research" ? "premium" : experience === "saved" ? "watchlist" : "signals");
   const [windowBlocks, setWindowBlocks] = useState<number>(DEFAULT_PONS_STATE_WINDOW);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [watchlist, setWatchlist] = useState<WatchEntry[]>([]);
   const [watchlistReady, setWatchlistReady] = useState(false);
+  const [watchTransitions, setWatchTransitions] = useState<Record<string, PonsTokenStateTransition>>({});
+  const [watchTransitionError, setWatchTransitionError] = useState<string | null>(null);
   const [passport, setPassport] = useState<PassportResponse | null>(null);
   const passportRequest = useRef(0);
   const [serverWatchesLoaded, setServerWatchesLoaded] = useState(false);
@@ -1196,25 +1194,20 @@ export function PonsObservatory() {
   const [wakeState, setWakeState] = useState<"idle" | "sending" | "accepted" | "failed">("idle");
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setThemeReady(true), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedWindow = Number(params.get("window"));
-    const requestedView = params.get("view") as ObservatoryView | null;
-    const timer = window.setTimeout(() => {
-      if (PONS_STATE_WINDOWS.includes(requestedWindow as (typeof PONS_STATE_WINDOWS)[number])) setWindowBlocks(requestedWindow);
-      if (requestedView && ["signals", "atlas", "watchlist", "tape", "history", "evidence", "network", "premium"].includes(requestedView)) setActiveView(requestedView);
-      if (params.get("pair")) setActivePair(params.get("pair")!.toUpperCase());
-      const requestedToken = tokenAddress(params.get("token") ?? "");
-      if (requestedToken) { setSelectedAddress(requestedToken); setSignalFilter("all"); }
-      if (params.get("inspect") === "1" && requestedToken) setDossierOpen(true);
+    const restoreLocation = () => {
+      const requested = parseObservatoryLocation(window.location.search, experience);
+      setWindowBlocks(requested.windowBlocks);
+      setActiveView(requested.view);
+      setActivePair(requested.pair);
+      setSelectedAddress(requested.token);
+      if (requested.token) setSignalFilter("all");
+      setDossierOpen(requested.openDossier);
       setPreferencesReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    };
+    const timer = window.setTimeout(restoreLocation, 0);
+    window.addEventListener("popstate", restoreLocation);
+    return () => { window.clearTimeout(timer); window.removeEventListener("popstate", restoreLocation); };
+  }, [experience]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1228,6 +1221,24 @@ export function PonsObservatory() {
     if (!watchlistReady) return;
     window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
   }, [watchlist, watchlistReady]);
+
+  const watchedAddresses = watchlist.map((entry) => entry.tokenAddress.toLowerCase()).sort().join(",");
+  useEffect(() => {
+    if (!watchedAddresses || (experience !== "saved" && activeView !== "watchlist")) return;
+    const controller = new AbortController();
+    const addresses = watchedAddresses.split(",");
+    const batches = Array.from({ length: Math.ceil(addresses.length / 50) }, (_, index) => addresses.slice(index * 50, index * 50 + 50));
+    void Promise.all(batches.map(async (batch) => {
+      const response = await fetch(`/api/state-changes?tokens=${encodeURIComponent(batch.join(","))}`, { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error("Saved state changes are temporarily unavailable.");
+      return response.json() as Promise<{ changes: { tokenAddress: string; transition: PonsTokenStateTransition }[]; partial: boolean }>;
+    })).then((pages) => {
+      if (controller.signal.aborted) return;
+      setWatchTransitions(Object.fromEntries(pages.flatMap((page) => page.changes.map((change) => [change.tokenAddress.toLowerCase(), change.transition]))));
+      setWatchTransitionError(pages.some((page) => page.partial) ? "Some saved state changes could not be read. Their absence is not evidence of stability." : null);
+    }).catch(() => { if (!controller.signal.aborted) setWatchTransitionError("Saved state changes could not refresh. Any dates shown belong to the last returned evidence."); });
+    return () => controller.abort();
+  }, [watchedAddresses, experience, activeView, state?.generatedAt]);
 
   const refreshPassport = useCallback(async (forceIdentitySync = false) => {
     const requestId = ++passportRequest.current;
@@ -1379,13 +1390,18 @@ export function PonsObservatory() {
   useEffect(() => {
     if (!preferencesReady) return;
     const url = new URL(window.location.href);
-    url.searchParams.set("view", activeView);
-    url.searchParams.set("pair", activePair);
-    url.searchParams.set("window", String(windowBlocks));
+    if (experience === "observe") {
+      url.searchParams.set("view", activeView);
+      url.searchParams.set("pair", activePair);
+      url.searchParams.set("window", String(windowBlocks));
+    } else {
+      url.searchParams.delete("view");
+    }
     if (selectedAddress) url.searchParams.set("token", selectedAddress);
     else url.searchParams.delete("token");
-    window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
-  }, [activePair, activeView, preferencesReady, selectedAddress, windowBlocks]);
+    const query = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${query ? `?${query}` : ""}`);
+  }, [activePair, activeView, experience, preferencesReady, selectedAddress, windowBlocks]);
 
   const wake = async () => {
     setWakeState("sending");
@@ -1491,34 +1507,31 @@ export function PonsObservatory() {
     setActivePair(launch.pairSymbol);
     setSelectedAddress(launch.tokenAddress);
     setActiveView("atlas");
+    setDossierOpen(true);
   };
   const unreadWatchAlerts = watchlist.reduce((total, entry) => total + entry.alerts.filter((item) => !item.read).length, 0);
 
   return (
-    <main className="min-h-screen px-3 pb-4 sm:px-5 lg:px-7">
-      <div className="mx-auto max-w-[1720px]">
-        <header className="observatory-header sticky top-0 z-40 -mx-3 mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-3 py-3 backdrop-blur-xl sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7">
-          <div className="flex min-w-0 items-center gap-3">
-            <a href="/" aria-label="Memetic State home" className="state-glyph-shell grid size-11 shrink-0 place-items-center text-signal focus-visible:outline-2 focus-visible:outline-offset-4"><StateGlyph className="size-10" /></a>
-            <div className="min-w-0"><h1 className="text-base font-bold uppercase tracking-[0.12em] text-foreground sm:text-lg">Memetic <span className="specimen-serif text-xl font-normal italic normal-case tracking-normal text-culture sm:text-2xl">State</span></h1><p className="mt-0.5 font-mono text-xs leading-relaxed tracking-[0.04em] text-muted-foreground">Independent attention intelligence for Robinhood Chain</p></div>
-          </div>
+    <main className="min-h-screen px-3 pb-24 sm:px-5 md:pb-6 lg:px-7">
+      <div className={`mx-auto ${experience === "observe" ? "max-w-[1720px]" : "max-w-[1180px]"}`}>
+        <AppHeader active={experience} passport={passport} onAccount={() => {
+          if (experience !== "observe") { window.location.assign("/app/observe?view=network#passport"); return; }
+          setActiveView("network"); window.setTimeout(() => document.getElementById("passport")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        }} />
+        <div className="mb-5 mt-5 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="font-mono text-xs uppercase tracking-[0.18em] text-attention">{experience === "observe" ? "Full evidence workspace" : experience === "research" ? "Holder workspace" : "Your research memory"}</p><h1 className="specimen-serif mt-2 text-3xl sm:text-4xl">{experience === "observe" ? "Observatory" : experience === "research" ? "Research" : "Saved"}</h1>{experience === "saved" ? <p className="mt-2 text-sm text-muted-foreground">Watch your tokens, revisit your questions, and compare saved evidence.</p> : null}</div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => void copyView()} aria-label="Copy current observatory view" title="Copy current view"
+            <Button type="button" variant="outline" size="icon-sm" onClick={() => void copyView()} aria-label="Copy current page link" title="Copy current view"
               className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/75"><Copy className="size-3.5" /></Button>
             <Button type="button" variant="outline" size="icon-sm" onClick={() => void refresh()} aria-label="Refresh PONS state" title="Refresh state"
               className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:bg-foreground/[0.06] hover:text-signal"><RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} /></Button>
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => setTheme(resolvedTheme === "light" ? "dark" : "light")} aria-label={`Use ${resolvedTheme === "light" ? "dark" : "light"} atlas`} title={`Use ${resolvedTheme === "light" ? "dark" : "light"} atlas`}
-              className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:bg-foreground/[0.06] hover:text-culture">
-              {themeReady && resolvedTheme === "light" ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
-            </Button>
-            <span className="mx-1 hidden h-5 w-px bg-foreground/10 sm:block" />
-            <HeaderWallet passport={passport} onAccount={() => { setActiveView("network"); window.setTimeout(() => document.getElementById("passport")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} />
           </div>
-        </header>
-
-        <div className="relative z-30 mb-4 flex items-center gap-3" role="search" aria-label="Search all Robinhood Chain tokens"><TokenSearch onSelect={inspectSearchResult} /><span className="hidden text-sm text-muted-foreground sm:block">Robinhood Chain</span></div>
+        </div>
 
         {copyState !== "idle" ? <div role="status" className="fixed right-4 top-20 z-50 rounded border border-foreground/10 bg-[var(--surface-popover)]/95 px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-signal shadow-xl">{copyState === "copied" ? "View link copied" : "Copy unavailable"}</div> : null}
+        {experience === "observe" ? <>
+        <div className="relative z-30 mb-4 flex items-center gap-3" role="search" aria-label="Search all Robinhood Chain tokens"><TokenSearch onSelect={inspectSearchResult} /><span className="hidden text-sm text-muted-foreground sm:block">Robinhood Chain</span></div>
+
         {state ? <div data-guide="freshness"><IntegrityRail state={state} onMetric={exploreMetric} /></div> : null}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-attention/25 px-3 py-2">
           <p role="status" className="min-w-60 flex-1 text-sm text-attention">{!state ? "Loading chain evidence…" : state.mode !== "live" || state.index.liveLagBlocks > 10_000 ? `Historical trade reading · ${integer.format(state.index.liveLagBlocks)} blocks behind. Readings describe the indexed window.` : `Current evidence · ${integer.format(state.index.liveLagBlocks)} blocks behind the observed head.`}</p>
@@ -1563,7 +1576,7 @@ export function PonsObservatory() {
               </div>
               <CohortMatrix cohorts={state.cohorts} onPair={choosePair} />
             </TabsContent>
-            <TabsContent value="watchlist"><WatchlistPanel entries={watchlist} launches={state.launches} onInspect={inspectWatched} onRulesChange={updateWatchRules} onRemove={removeWatch} onReadAll={markWatchAlertsRead} storageMode={passport?.authenticated ? "passport" : "device"} syncMessage={watchSyncMessage} /></TabsContent>
+            <TabsContent value="watchlist"><WatchlistPanel transitions={watchTransitions} transitionError={watchTransitionError} entries={watchlist} launches={state.launches} onInspect={inspectWatched} onRulesChange={updateWatchRules} onRemove={removeWatch} onReadAll={markWatchAlertsRead} storageMode={passport?.authenticated ? "passport" : "device"} syncMessage={watchSyncMessage} /></TabsContent>
             <TabsContent value="tape"><FactoryActivity state={state} stream={factoryStream} onInspect={(event) => { setFactoryEvent(event); setSelectedAddress(event.tokenAddress); setDossierOpen(true); }} expanded /><PonsTape events={state.tape} onInspect={inspectLeader} state={state} /></TabsContent>
             <TabsContent value="history"><ProtocolHistoryPanel state={state} /></TabsContent>
             <TabsContent value="premium"><PremiumResearchWorkspace key={identityVersion} passport={passport} launches={state.launches} initialToken={selectedAddress} onRefreshPassport={refreshPassport} /></TabsContent>
@@ -1575,15 +1588,19 @@ export function PonsObservatory() {
             <TabsContent value="network"><NetworkPanel state={state} passport={passport} localWatchCount={watchlist.length} windowBlocks={windowBlocks} onOpenSignals={() => setActiveView("signals")} onOpenWatchlist={() => setActiveView("watchlist")} onRefreshPassport={refreshPassport} onSyncWatches={syncCurrentWatches} /></TabsContent>
           </Tabs>
         )}
+        </> : experience === "research" ? <PremiumResearchWorkspace key={identityVersion} passport={passport} launches={state?.launches ?? []} initialToken={selectedAddress} onRefreshPassport={refreshPassport} /> : <div className="space-y-8">
+          <section aria-label="Saved token watches"><WatchlistPanel transitions={watchTransitions} transitionError={watchTransitionError} entries={watchlist} launches={state?.launches ?? []} onInspect={inspectWatched} onRulesChange={updateWatchRules} onRemove={removeWatch} onReadAll={markWatchAlertsRead} storageMode={passport?.authenticated ? "passport" : "device"} syncMessage={watchSyncMessage} /></section>
+          <PremiumResearchWorkspace key={identityVersion} passport={passport} launches={state?.launches ?? []} initialToken={selectedAddress} initialTab="saved" onRefreshPassport={refreshPassport} />
+        </div>}
 
         {pulseSelection ? <PulseEvidence key={`${pulseSelection.metric}:${pulseSelection.toBlock}`} selection={pulseSelection} onClose={() => setPulseSelection(null)} onInspect={inspectLeader} /> : null}
         <Dialog open={dossierOpen} onOpenChange={setDossierOpen}><DialogContent className="max-h-[90dvh] overflow-y-auto p-3 sm:max-w-2xl">
           <DialogTitle className="px-3 pt-2">Inspect evidence{selected ? ` · ${selected.symbol === "—" ? selected.name : selected.symbol}` : ""}</DialogTitle>
           <DialogDescription className="px-3">The same dated evidence, from every view.</DialogDescription>
           {selectedAddress ? <TokenOverview key={selectedAddress} address={selectedAddress} indexed={Boolean(selected)} onIdentity={setSelectedIdentity} /> : null}
-          {factoryEvent ? <section className="rounded-lg border border-signal/20 p-4 text-sm leading-7"><p className="font-semibold text-signal">{factoryEvent.detail}</p><p>{factoryEvent.tokenSymbol === "—" ? "Token identity is being resolved" : factoryEvent.tokenSymbol} · {quoteAssetLabel(factoryEvent.pairSymbol)} habitat</p><p>Block {integer.format(factoryEvent.blockNumber)} · {new Date(factoryEvent.observedAt).toUTCString()}</p><p className="mt-2 text-muted-foreground">This factory event is confirmed independently. Trade activity, holder retention and present relevance require separate evidence; the event itself earns no attention score.</p><div className="mt-3 flex flex-wrap gap-4"><a className="underline" href={`https://robinhoodchain.blockscout.com/tx/${factoryEvent.txHash}`} target="_blank" rel="noreferrer">Inspect transaction <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={`https://robinhoodchain.blockscout.com/address/${factoryEvent.tokenAddress}`} target="_blank" rel="noreferrer">{short(factoryEvent.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={`https://www.ponsfamily.com/launchpad/${factoryEvent.tokenAddress}`} target="_blank" rel="noreferrer">Open PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a></div></section> : null}
+          {factoryEvent ? <section className="rounded-lg border border-signal/20 p-4 text-sm leading-7"><p className="font-semibold text-signal">{factoryEvent.detail}</p><p>{factoryEvent.tokenSymbol === "—" ? "Token identity is being resolved" : factoryEvent.tokenSymbol} · {quoteAssetLabel(factoryEvent.pairSymbol)} habitat</p><p>Block {integer.format(factoryEvent.blockNumber)} · {new Date(factoryEvent.observedAt).toUTCString()}</p><p className="mt-2 text-muted-foreground">This factory event is confirmed independently. Trade activity, holder retention and present relevance require separate evidence; the event itself earns no attention score.</p><div className="mt-3 flex flex-wrap gap-4"><a className="underline" href={robinhoodExplorer.tx(factoryEvent.txHash)} target="_blank" rel="noreferrer">Inspect transaction <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={robinhoodExplorer.address(factoryEvent.tokenAddress)} target="_blank" rel="noreferrer">{short(factoryEvent.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={`https://www.ponsfamily.com/launchpad/${factoryEvent.tokenAddress}`} target="_blank" rel="noreferrer">Open PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a></div></section> : null}
           {selected ? <LaunchDossier launch={selected} saved={isSaved(selected.tokenAddress)} onToggleSave={toggleWatch} /> : null}
-          {selected ? <Button variant="outline" onClick={() => { setDossierOpen(false); setActiveView("premium"); }}><ShieldCheck />Open full research · Premium</Button> : null}
+          {selectedAddress ? <a href={appTokenHref("research", selectedAddress)} className="inline-flex items-center justify-center gap-2 rounded border border-foreground/15 px-4 py-3 text-sm hover:bg-foreground/5"><ShieldCheck className="size-4" />Ask about this token · Holder access</a> : null}
         </DialogContent></Dialog>
         <footer className="mt-4 flex flex-col justify-between gap-2 border-t border-foreground/10 px-1 pt-4 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground sm:flex-row">
           <a href="/docs" className="text-attention underline underline-offset-4">Documentation</a>

@@ -1,4 +1,6 @@
 "use client";
+
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 import { ArrowUpRight, ExternalLink, GitBranch } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { PonsProtocolGeneration, PonsStateResponse } from "@/lib/pons/model";
@@ -55,7 +57,7 @@ export function ProtocolCoveragePanel({ state, onBrowse }: { state: PonsStateRes
           <CoverageTrack label="Historical activity coverage" value={generation.swapProgress ?? generation.historicalProgress} />
           <p className="text-[10px] leading-4 text-muted-foreground">{generation.indexedThroughBlock ? `Activity through #${integer.format(generation.indexedThroughBlock)}` : `History begins at #${integer.format(generation.startBlock)}`}<span className="mx-1.5 text-foreground/20">/</span>{generation.rankingEligible ? "In rankings" : "Outside rankings"}</p>
         </div>
-        <a href={`https://robinhoodchain.blockscout.com/address/${generation.factory}`} target="_blank" rel="noreferrer" aria-label={`View ${style.mark} ${style.label} contract on block explorer`} className="coverage-contract inline-flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground transition hover:text-[var(--generation-tone)]">{generation.factory.slice(0, 6)}…{generation.factory.slice(-4)}<ExternalLink className="size-3" /></a>
+        <a href={robinhoodExplorer.address(generation.factory)} target="_blank" rel="noreferrer" aria-label={`View ${style.mark} ${style.label} contract on block explorer`} className="coverage-contract inline-flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground transition hover:text-[var(--generation-tone)]">{generation.factory.slice(0, 6)}…{generation.factory.slice(-4)}<ExternalLink className="size-3" /></a>
       </article>;
     })}</div>
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 px-5 py-3 text-[10px] text-muted-foreground sm:px-6"><span><strong className="font-medium text-signal">Ranking scope</strong><span className="mx-2 text-foreground/20">/</span>V2 activity · historical V1 coverage remains separate</span><a href="https://docs.ponsfamily.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-attention">PONS documentation<ExternalLink className="size-2.5" /></a></div>

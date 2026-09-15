@@ -1,5 +1,7 @@
 "use client";
 
+import { canonicalRobinhoodExplorerUrl } from "@/lib/robinhood-explorer";
+
 import type { ResearchFinding, ResearchReport, ResearchThesis } from "@/lib/researcher/model";
 
 const date = (value: string) => new Date(value).toLocaleString(undefined, { timeZoneName: "short" });
@@ -22,7 +24,7 @@ export function ResearchThesisView({ thesis, reviewStatus }: { thesis: ResearchT
     <details className="border-t border-foreground/12 pt-4"><summary className="cursor-pointer text-base font-semibold">Review notes & remembered evidence</summary><p className="mt-3 text-sm leading-6 text-muted-foreground">One AI review pass, not independent verification. These notes summarize concerns and decisions; they are not an agent conversation.</p>
       <dl className="mt-4 space-y-4">{thesis.reviewNotes.map((note, i) => <div key={i}><dt className="text-base font-semibold">{note.issue}</dt><dd className="mt-1 text-base leading-7 text-muted-foreground">{note.resolution}</dd></div>)}</dl>
       <h5 className="mt-5 font-semibold">Unresolved gaps</h5><ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7 text-muted-foreground">{thesis.unknowns.map((gap, i) => <li key={i}>{gap}</li>)}</ul>
-      <div className="mt-5 space-y-4">{thesis.sources.map(source => <section id={`thesis-source-${source.id}`} key={source.id} className="scroll-mt-24 rounded border border-foreground/12 p-4"><h5 className="font-semibold">{source.label}</h5><p className="mt-2 text-sm text-muted-foreground">{source.freshness === "recent" ? "Recent when reviewed" : source.freshness} · Evidence time: {source.evidenceAt ? date(source.evidenceAt) : "Unavailable"}</p><ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7">{source.facts.map((fact, i) => <li key={i}>{fact}</li>)}</ul><ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">{source.limitations.map((limit, i) => <li key={i}>{limit}</li>)}</ul><a href={source.url} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-signal underline underline-offset-4">Open source</a></section>)}</div>
+      <div className="mt-5 space-y-4">{thesis.sources.map(source => <section id={`thesis-source-${source.id}`} key={source.id} className="scroll-mt-24 rounded border border-foreground/12 p-4"><h5 className="font-semibold">{source.label}</h5><p className="mt-2 text-sm text-muted-foreground">{source.freshness === "recent" ? "Recent when reviewed" : source.freshness} · Evidence time: {source.evidenceAt ? date(source.evidenceAt) : "Unavailable"}</p><ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7">{source.facts.map((fact, i) => <li key={i}>{fact}</li>)}</ul><ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">{source.limitations.map((limit, i) => <li key={i}>{limit}</li>)}</ul><a href={canonicalRobinhoodExplorerUrl(source.url)} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-signal underline underline-offset-4">Open source</a></section>)}</div>
     </details>
   </section>;
 }

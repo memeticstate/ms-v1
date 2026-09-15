@@ -1,5 +1,7 @@
 "use client";
 
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
+
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Database, Gauge, GitBranch, ShieldCheck } from "lucide-react";
 
@@ -229,7 +231,7 @@ export function SpeciesDossier({
           <div className="flex min-w-0 items-center gap-2">
             <ShieldCheck aria-hidden="true" className="size-3 shrink-0 text-signal" />
             <a
-              href={`https://robinhoodchain.blockscout.com/address/${species.contract}`}
+              href={robinhoodExplorer.address(species.contract)}
               target="_blank"
               rel="noreferrer"
               className="truncate underline decoration-white/15 underline-offset-4 hover:text-muted-foreground"

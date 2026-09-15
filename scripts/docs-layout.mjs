@@ -52,7 +52,7 @@ export async function refreshDocumentationLayout(output, chapters) {
       const next = chapters[index + offset];
       return next ? `<a href="${pagePath(next[1])}"><small>${label}</small><span>${chapterLabel(next)}</span></a>` : "<span></span>";
     };
-    const holder = '<a class="holder" href="https://memeticstate.com/app?view=premium"><span>Premium access</span><span class="holder-threshold">0.1% holding</span></a>';
+    const holder = '<a class="holder" href="https://memeticstate.com/app/research"><span>Premium access</span><span class="holder-threshold">0.1% holding</span></a>';
     const page = `<!doctype html>
 <html lang="en">
 <head>

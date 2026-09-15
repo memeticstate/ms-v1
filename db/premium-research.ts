@@ -1,9 +1,10 @@
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 import { getD1 } from "@/db";
 import { currentPonsEvidence } from "@/lib/pons/research";
 import type { PonsStateResponse } from "@/lib/pons/model";
 import { readPremiumEcology } from "./premium-ecology";
 import { researchWorkflow, type ResearchSelection } from "@/lib/premium/workflow";
-import { COMPARISON_SAMPLE_LIMIT, COMPARISON_WINDOW_BLOCKS, EXPLORER, HISTORY_PAGE_SIZE, pageEvidence, researchNote, type EvidenceRecord, type ResearchDossier, type ResearchWindow } from "@/lib/premium/research";
+import { COMPARISON_SAMPLE_LIMIT, COMPARISON_WINDOW_BLOCKS, HISTORY_PAGE_SIZE, pageEvidence, researchNote, type EvidenceRecord, type ResearchDossier, type ResearchWindow } from "@/lib/premium/research";
 
 export type ResearchQuery = { token: string; cursor: { block: number; log: number } | null; through: number | null; windowBlocks?: number; kind?: ResearchSelection["kind"]; scope?: ResearchSelection["scope"] };
 type RawRecord = { id: string; kind: string; block_number: number; log_index: number; block_timestamp: number; observed_at: number; tx_hash: string; actor: string | null; quote_amount_raw: string | null; token_amount_raw: string | null };
@@ -51,7 +52,7 @@ export async function readPremiumDossier(state: PonsStateResponse, query: Resear
   const records: EvidenceRecord[] = [...tradeResult.results, ...eventResult.results].map((row) => ({
     id: row.id, kind: row.kind, blockNumber: row.block_number, logIndex: row.log_index,
     observedAt: secondsIso(row.block_timestamp)!, indexedAt: new Date(row.observed_at).toISOString(),
-    transaction: row.tx_hash, sourceUrl: `${EXPLORER}/tx/${row.tx_hash}`, actor: row.actor,
+    transaction: row.tx_hash, sourceUrl: robinhoodExplorer.tx(row.tx_hash), actor: row.actor,
     quoteAmountRaw: row.quote_amount_raw, tokenAmountRaw: row.token_amount_raw,
   }));
   if (!quote || !Number.isInteger(quote.pair_decimals) || quote.pair_decimals < 0 || quote.pair_decimals > 36) throw new Error("quote_metadata_unavailable");

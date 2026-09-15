@@ -30,6 +30,7 @@ export function mergeFactoryEvents(previous: PonsTapeEvent[], incoming: PonsTape
 }
 
 export function factoryFeedFresh(feed: PonsFactoryFeed | null | undefined, now = Date.now()) {
+  const age = feed ? now - Date.parse(feed.observedAt) : Infinity;
   return Boolean(feed && feed.indexedBlock > 0 && feed.consecutiveFailures === 0 && !feed.lastError
-    && feed.headBlock - feed.indexedBlock <= 3000 && now - Date.parse(feed.observedAt) <= 120_000);
+    && feed.headBlock >= feed.indexedBlock && feed.headBlock - feed.indexedBlock <= 3000 && age >= -30_000 && age <= 120_000);
 }

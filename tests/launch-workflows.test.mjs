@@ -93,10 +93,11 @@ test("Pulse visual export is X-ready and evidence labeled", async () => {
 test("Field Archive branding ships a real day and night atlas", async () => {
   const css = await readFile(path.join(root, "app/globals.css"), "utf8");
   const layout = await readFile(path.join(root, "app/layout.tsx"), "utf8");
-  const observatory = await readFile(path.join(root, "components/pons-observatory.tsx"), "utf8");
+  const header = await readFile(path.join(root, "components/app-header.tsx"), "utf8");
   assert.match(css, /--lichen-green: #a4b579/);
   assert.match(css, /\.light \{[\s\S]*--background: #e8e1d2/);
   assert.doesNotMatch(css, /#00ffcc|#8a2be2/i);
   assert.match(layout, /<ThemeProvider>/);
-  assert.match(observatory, /Use \$\{resolvedTheme === "light" \? "dark" : "light"\} atlas/);
+  assert.match(header, /aria-label="Toggle light and dark theme"/);
+  assert.match(header, /setTheme\(resolvedTheme === 'dark' \? 'light' : 'dark'\)/);
 });

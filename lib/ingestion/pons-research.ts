@@ -1,3 +1,4 @@
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 import { decodeAbiParameters, encodeFunctionData, parseAbi } from "viem";
 import { getRuntimeBinding } from "@/db";
 import { acquireAuxJob, recentTokenActors, releaseAuxJob, researchCandidate, storeTokenEvidence } from "@/db/pons-research";
@@ -76,7 +77,7 @@ export async function runTokenResearch(
       deployerSharePercent: null, holderCount: null, meaningfulHolders: null, largestWalletSharePercent: null,
       holderSampleSize: 0, holdersComplete: false, sampleBasis: "indexed-actors", poolAddress: null, twitterUrl: null,
       social: { status: "unconfigured", mentions: null, authors: null, latestPostAt: null, posts: [] },
-      sources: [`https://robinhoodchain.blockscout.com/token/${address}`], errors: [],
+      sources: [robinhoodExplorer.token(address)], errors: [],
     };
     try {
       const head = await getPonsHead();

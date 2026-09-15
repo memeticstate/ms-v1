@@ -4,7 +4,6 @@ import { RESEARCH_WINDOW_OPTIONS, type ResearchSelection, type ResearchEcology, 
 export const HISTORY_PAGE_SIZE = 100;
 export const COMPARISON_WINDOW_BLOCKS = 25_000;
 export const COMPARISON_SAMPLE_LIMIT = 5_000;
-export const EXPLORER = "https://robinhoodchain.blockscout.com";
 
 export type EvidenceRecord = {
   id: string;

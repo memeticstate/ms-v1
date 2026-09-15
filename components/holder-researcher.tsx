@@ -1,5 +1,7 @@
 "use client";
 
+import { robinhoodExplorer, canonicalRobinhoodExplorerUrl } from "@/lib/robinhood-explorer";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Clock3, Loader2, Pause, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useMemeticAuth } from "@/components/memetic-auth-provider";
@@ -57,18 +59,18 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
       <p className="mt-3 text-sm text-muted-foreground">Evidence time: {date(source.evidenceAt)} · Retrieved: {date(source.fetchedAt)}</p>
       {source.facts.length ? <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7">{source.facts.map((fact, i) => <li key={i}>{fact}</li>)}</ul> : null}
       <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">{source.limitations.map((limit, i) => <li key={i}>{limit}</li>)}</ul>
-      <a href={source.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1 text-sm text-signal underline underline-offset-4">Open source <ArrowUpRight className="size-4" /></a>
+      <a href={canonicalRobinhoodExplorerUrl(source.url)} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1 text-sm text-signal underline underline-offset-4">Open source <ArrowUpRight className="size-4" /></a>
     </details>)}</div></section>
     <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Investigation steps</summary><ol className="mt-3 list-decimal space-y-2 pl-5">{report.steps.map((step, i) => <li key={i}>{step.tool}: {step.note}</li>)}</ol></details>
   </div>;
 }
 
-export function HolderResearcher({ accessExpiresAt, initialToken }: { accessExpiresAt: string | null; initialToken: string | null }) {
+export function HolderResearcher({ accessExpiresAt, initialToken, view = "ask" }: { accessExpiresAt: string | null; initialToken: string | null; view?: "ask" | "saved" }) {
   const { authFetch, identityVersion } = useMemeticAuth();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(view === "ask");
   const [token, setToken] = useState(initialToken ?? "");
   const [identity, setIdentity] = useState<TokenSearchResult | null>(null);
   const [focus, setFocus] = useState<ResearchFocus>("overview");
@@ -78,6 +80,12 @@ export function HolderResearcher({ accessExpiresAt, initialToken }: { accessExpi
   const [expired, setExpired] = useState(false);
   const session = useRef(0), reading = useRef<AbortController | null>(null), writing = useRef<AbortController | null>(null);
   const selectedRef = useRef(selected); selectedRef.current = selected;
+
+  useEffect(() => {
+    if (!initialToken) return;
+    setToken(initialToken); setIdentity(null);
+    if (view === "ask") setCreating(true);
+  }, [initialToken, view]);
 
   const request = useCallback(async (path: string, init: RequestInit) => {
     const response = await authFetch(path, { ...init, cache: "no-store" });
@@ -97,10 +105,10 @@ export function HolderResearcher({ accessExpiresAt, initialToken }: { accessExpi
       if (controller.signal.aborted || version !== session.current || (id && id !== selectedRef.current)) return;
       setWorkspace(data);
       if (!id && data.assignments[0]) setSelected(data.assignments[0].id);
-      if (!data.assignments.length) setCreating(true);
+      if (!data.assignments.length && view === "ask") setCreating(true);
       if (!quiet) setError("");
     } catch (caught) { if (!controller.signal.aborted && version === session.current) setError(caught instanceof Error ? caught.message : "Research is unavailable."); }
-  }, [request]);
+  }, [request, view]);
   useEffect(() => {
     session.current++; setWorkspace(null); setSelected(null); setReportId(null); setExpired(false); setError(""); setNotice("");
     void load(null);
@@ -142,13 +150,14 @@ export function HolderResearcher({ accessExpiresAt, initialToken }: { accessExpi
   const currentReport = currentRun?.report;
   if (expired) return <div className={panel}><p className="text-base leading-7">Recheck holder access above to reopen your private researcher.</p></div>;
   return <section aria-label="Holder researcher" className="space-y-4">
-    <header className={panel}><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm uppercase tracking-widest text-attention">Researcher · early access</p><h3 className="specimen-serif mt-2 text-3xl sm:text-4xl">Give your curiosity a brief.</h3><p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">Save a question about a token. Gather the evidence, follow what changes, and keep a dated reading.</p></div><Button variant="outline" onClick={() => setCreating(true)} disabled={busy || (workspace?.assignments.length ?? 0) >= RESEARCH_LIMITS.assignments}><Plus />New assignment</Button></div>
+    <header className={panel}><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm uppercase tracking-widest text-attention">{view === "saved" ? "Saved questions and reports" : "Ask the researcher"}</p><h3 className="specimen-serif mt-2 text-3xl sm:text-4xl">{view === "saved" ? "Pick up where you left off." : "One token. One useful question."}</h3><p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">{view === "saved" ? "Open an assignment to compare its dated readings, run a new check, or change its schedule." : "Save a question about a token. Gather the evidence, follow what changes, and keep a dated reading."}</p></div>{view === "saved" ? <a href="/app/research" className="inline-flex items-center gap-2 rounded border border-foreground/15 px-4 py-2 text-sm"><Plus className="size-4" />Ask a new question</a> : <Button variant="outline" onClick={() => setCreating(true)} disabled={busy || (workspace?.assignments.length ?? 0) >= RESEARCH_LIMITS.assignments}><Plus />New question</Button>}</div>
       <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground"><span>Private to your account</span><span>Robinhood Chain · PONS sources</span>{workspace ? <span>{workspace.usage.used} / {workspace.usage.limit} checks today · resets at 00:00 UTC</span> : null}</div>
       {workspace && !workspace.configured ? <p className="mt-4 rounded border border-attention/25 p-3 text-sm leading-6 text-attention">Evidence collection is available. AI interpretation has not been connected yet.</p> : null}
     </header>
     {error ? <div role="alert" className={`${panel} text-attention`}><p>{error}</p><Button variant="outline" onClick={() => void load(selected)} className="mt-3"><RefreshCw />Refresh workspace</Button></div> : null}
     {notice ? <p role="status" className="px-2 text-base text-signal">{notice}</p> : null}
     {!workspace && !error ? <p role="status" className="flex items-center gap-2 p-5 text-base text-muted-foreground"><Loader2 className="size-4 animate-spin" />Opening your research…</p> : null}
+    {view === "saved" && workspace && !workspace.assignments.length ? <p className={`${panel} text-base leading-7 text-muted-foreground`}>No saved questions yet. Ask about a token to start a dated research record.</p> : null}
     {creating && workspace ? <form className={panel} onSubmit={e => { e.preventDefault(); void mutate("POST", { action: "create", tokenAddress: token, question, focus, cadence }); }}>
       <div className="flex items-center justify-between gap-3"><h4 className="text-xl font-semibold">A new assignment</h4>{workspace.assignments.length ? <Button type="button" variant="ghost" onClick={() => setCreating(false)}>Cancel</Button> : null}</div>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">Choose one token and one question. Source coverage varies; unsupported questions remain explicit gaps.</p>
@@ -163,7 +172,7 @@ export function HolderResearcher({ accessExpiresAt, initialToken }: { accessExpi
     </form> : null}
     {workspace?.assignments.length ? <div className="grid items-start gap-4 lg:grid-cols-[280px_minmax(0,1fr)]"><aside className={panel}><h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Your assignments</h4><div className="space-y-2">{workspace.assignments.map(item => <button key={item.id} type="button" aria-pressed={selected === item.id} onClick={() => { setSelected(item.id); setCreating(false); }} className={`w-full rounded border p-3 text-left ${selected === item.id ? "border-signal/40 bg-signal/10" : "border-foreground/10 hover:bg-foreground/5"}`}><span className="block font-mono text-sm text-signal">{short(item.tokenAddress)}</span><span className="mt-2 line-clamp-3 block text-base leading-6">{item.question}</span><span className="mt-3 block text-sm text-muted-foreground">{item.paused ? "Paused" : item.cadence === "manual" ? "Checks on request" : `${item.cadence[0].toUpperCase()}${item.cadence.slice(1)} checks`}</span></button>)}</div></aside>
     <article className={`${panel} min-w-0`}>
-      {task ? <><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm text-attention">{focusLabels[task.focus]}</p><h4 className="specimen-serif mt-2 break-words text-2xl sm:text-3xl">{currentReport?.symbol && currentReport.symbol !== "—" ? currentReport.symbol : currentReport?.name ?? short(task.tokenAddress)}</h4><a href={`https://robinhoodchain.blockscout.com/address/${task.tokenAddress}`} target="_blank" rel="noreferrer" className="mt-2 block break-all font-mono text-sm text-muted-foreground underline underline-offset-4">{task.tokenAddress}</a></div><Button onClick={() => void mutate("POST", { action: "run", id: task.id })} disabled={busy || running || task.paused || workspace.usage.used >= workspace.usage.limit}><RefreshCw className={running ? "animate-spin" : ""} />{running ? "Checking…" : "Run now"}</Button></div>
+      {task ? <><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm text-attention">{focusLabels[task.focus]}</p><h4 className="specimen-serif mt-2 break-words text-2xl sm:text-3xl">{currentReport?.symbol && currentReport.symbol !== "—" ? currentReport.symbol : currentReport?.name ?? short(task.tokenAddress)}</h4><a href={robinhoodExplorer.address(task.tokenAddress)} target="_blank" rel="noreferrer" className="mt-2 block break-all font-mono text-sm text-muted-foreground underline underline-offset-4">{task.tokenAddress}</a></div><Button onClick={() => void mutate("POST", { action: "run", id: task.id })} disabled={busy || running || task.paused || workspace.usage.used >= workspace.usage.limit}><RefreshCw className={running ? "animate-spin" : ""} />{running ? "Checking…" : "Run now"}</Button></div>
         <p className="mt-4 text-base leading-7">{task.question}</p>
         <div className="mt-5 flex flex-wrap items-center gap-3 border-y border-foreground/12 py-4"><Select value={task.cadence} onValueChange={value => void mutate("PATCH", { id: task.id, paused: task.paused, cadence: value })} disabled={busy}><SelectTrigger className="w-48" aria-label="Assignment repeat schedule"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual">When I ask</SelectItem><SelectItem value="hourly">Hourly</SelectItem><SelectItem value="daily">Daily</SelectItem></SelectContent></Select><Button variant="outline" disabled={busy} onClick={() => void mutate("PATCH", { id: task.id, paused: !task.paused, cadence: task.cadence })}>{task.paused ? <Play /> : <Pause />}{task.paused ? "Resume" : "Pause"}</Button>
           <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" aria-label="Delete assignment" disabled={busy}><Trash2 /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogTitle>Remove this assignment?</AlertDialogTitle><AlertDialogDescription>Its saved reports will also be deleted and future checks will stop.</AlertDialogDescription><AlertDialogFooter><AlertDialogCancel>Keep assignment</AlertDialogCancel><AlertDialogAction onClick={() => void mutate("DELETE", { id: task.id })}>Remove assignment</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

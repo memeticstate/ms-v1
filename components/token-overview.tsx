@@ -1,5 +1,7 @@
 "use client";
 
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
+
 import { useEffect, useState } from "react";
 import { TokenAvatar } from "./token-avatar";
 import { tokenTitle, tokenSubtitle, type TokenSearchResult } from "@/lib/tokens/model";
@@ -29,6 +31,6 @@ export function TokenOverview({ address, indexed, onIdentity }: {
       {token.sourceFetchedAt ? <p className="mt-1 text-xs text-muted-foreground">Snapshot retrieved: {new Date(token.sourceFetchedAt).toUTCString()}{token.sourceStale ? " · refresh unavailable" : ""}</p> : null}
       <p className="mt-2 text-muted-foreground">Market information is reported by PONS and is separate from the indexed research below.</p></> : null}
     {!indexed ? <p className="mt-3 text-muted-foreground" role="status">{status === "loading" ? "Looking up this exact contract…" : status === "error" ? "The token lookup couldn’t connect. You can inspect this address directly below." : token ? "This token is outside the current research window. Its identity is available; a complete Memetic reading is not yet available." : "No token identity was resolved for this address on Robinhood Chain."}</p> : null}
-    <div className="mt-4 flex flex-wrap gap-4"><a className="underline underline-offset-4" href={`https://robinhoodchain.blockscout.com/address/${address}`} target="_blank" rel="noreferrer">View contract ↗</a>{token?.source === "pons" ? <a className="underline underline-offset-4" href={`https://www.ponsfamily.com/launchpad/${address}`} target="_blank" rel="noreferrer">Open token on PONS ↗</a> : null}</div>
+    <div className="mt-4 flex flex-wrap gap-4"><a className="underline underline-offset-4" href={robinhoodExplorer.address(address)} target="_blank" rel="noreferrer">View contract ↗</a>{token?.source === "pons" ? <a className="underline underline-offset-4" href={`https://www.ponsfamily.com/launchpad/${address}`} target="_blank" rel="noreferrer">Open token on PONS ↗</a> : null}</div>
   </section>;
 }
