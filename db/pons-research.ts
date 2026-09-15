@@ -5,6 +5,8 @@ import { PONS_SIGNAL_WINDOW_BLOCKS, ponsMomentumPercent } from "@/lib/pons/signa
 import { applyResearchPolicy } from "@/lib/pons/research";
 import { cachedTokenIdentities } from "@/db/token-discovery";
 
+import type { PonsTokenStateTransition } from "@/lib/pons/model";
+
 export const PONS_HOLDER_REFRESH_MS = 8 * 60_000;
 export const PONS_HOLDER_RETRY_MS = 3 * 60_000;
 
@@ -375,6 +377,318 @@ async function archivedLaunches(addresses: string[], state: PonsStateResponse): 
   });
 }
 
+type StoredTokenState = {
+  token_address: string;
+  observed_at: number;
+  signal: PonsActivitySignal;
+  eligible: number;
+  phase: string;
+  evidence_status: string;
+  holder_qualified: number;
+  change_kind: string;
+  payload_json: string;
+  state_rank: number;
+};
+
+const VERIFIED_SIGNALS = new Set<PonsActivitySignal>([
+  "steady",
+  "broadening",
+  "surging",
+]);
+
+function transitionKind(
+  previous: StoredTokenState,
+  current: StoredTokenState,
+): PonsTokenStateTransition["kind"] {
+  if (previous.phase !== current.phase) return "lifecycle";
+
+  if (current.signal === "inactive" && previous.signal !== "inactive") {
+    return "inactive";
+  }
+
+  if (current.signal === "stressed" && previous.signal !== "stressed") {
+    return "deteriorated";
+  }
+
+  if (
+    previous.signal === "stressed"
+    && VERIFIED_SIGNALS.has(current.signal)
+  ) {
+    return "recovered";
+  }
+
+  if (
+    !VERIFIED_SIGNALS.has(previous.signal)
+    && VERIFIED_SIGNALS.has(current.signal)
+  ) {
+    return "strengthened";
+  }
+
+  if (
+    VERIFIED_SIGNALS.has(previous.signal)
+    && current.signal === "unverified"
+  ) {
+    return "verification-lost";
+  }
+
+  if (
+    previous.signal === "stressed"
+    && current.signal === "unverified"
+  ) {
+    return "stress-cleared";
+  }
+
+  if (previous.signal !== current.signal) return "state-change";
+
+  if (
+    previous.evidence_status !== current.evidence_status
+    || Boolean(previous.holder_qualified) !== Boolean(current.holder_qualified)
+    || Boolean(previous.eligible) !== Boolean(current.eligible)
+  ) {
+    return "evidence-update";
+  }
+
+  return "state-change";
+}
+
+function transitionLabel(kind: PonsTokenStateTransition["kind"]) {
+  switch (kind) {
+    case "strengthened": return "Current participation became verified";
+    case "deteriorated": return "Participation moved under stress";
+    case "recovered": return "Recovered from stress";
+    case "verification-lost": return "Verification was lost";
+    case "stress-cleared": return "Stress is no longer confirmed";
+    case "inactive": return "Participation became inactive";
+    case "lifecycle": return "Lifecycle changed";
+    case "evidence-update": return "Evidence changed";
+    default: return "State changed";
+  }
+}
+
+function payloadObject(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object"
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function payloadNumber(
+  payload: Record<string, unknown>,
+  key: string,
+): number | null {
+  const value = payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function payloadString(
+  payload: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function payloadStrings(
+  payload: Record<string, unknown>,
+  key: string,
+): string[] {
+  const value = payload[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is string => typeof item === "string" && Boolean(item.trim()),
+  );
+}
+
+function explainTransition(
+  previous: StoredTokenState,
+  current: StoredTokenState,
+): PonsTokenStateTransition {
+  const before = payloadObject(previous.payload_json);
+  const after = payloadObject(current.payload_json);
+  const kind = transitionKind(previous, current);
+  const changes: string[] = [];
+
+  if (previous.signal !== current.signal) {
+    changes.push(
+      `Measured state changed from ${previous.signal} to ${current.signal}.`,
+    );
+  }
+
+  if (previous.phase !== current.phase) {
+    changes.push(
+      `Lifecycle moved from ${previous.phase} to ${current.phase}.`,
+    );
+  }
+
+  if (current.signal === "stressed" || current.signal === "inactive") {
+    const reasons = payloadStrings(after, "researchReasons");
+    for (const reason of reasons.slice(0, 2)) {
+      if (!changes.includes(reason)) changes.push(reason);
+    }
+  }
+
+  if (previous.evidence_status !== current.evidence_status) {
+    if (
+      previous.evidence_status === "missing"
+      && current.evidence_status !== "missing"
+    ) {
+      changes.push("Current holder evidence became available.");
+    } else if (
+      current.evidence_status === "missing"
+      || current.evidence_status === "unavailable"
+    ) {
+      changes.push("Current holder evidence became unavailable.");
+    } else {
+      changes.push(
+        `Holder evidence changed from ${previous.evidence_status} to ${current.evidence_status}.`,
+      );
+    }
+  }
+
+  if (
+    !Boolean(previous.holder_qualified)
+    && Boolean(current.holder_qualified)
+  ) {
+    changes.push("Sampled holder breadth crossed the verification requirement.");
+  } else if (
+    Boolean(previous.holder_qualified)
+    && !Boolean(current.holder_qualified)
+  ) {
+    changes.push("Sampled holder breadth fell below the verification requirement.");
+  }
+
+  if (!Boolean(previous.eligible) && Boolean(current.eligible)) {
+    changes.push("Current eligibility requirements are now satisfied.");
+  } else if (Boolean(previous.eligible) && !Boolean(current.eligible)) {
+    changes.push("Current eligibility requirements are no longer satisfied.");
+  }
+
+  const beforeTrades = payloadNumber(before, "recentTrades");
+  const afterTrades = payloadNumber(after, "recentTrades");
+  if (
+    beforeTrades !== null
+    && afterTrades !== null
+    && beforeTrades !== afterTrades
+  ) {
+    const delta = beforeTrades > 0
+      ? Math.abs(afterTrades - beforeTrades) / beforeTrades
+      : 1;
+
+    if (delta >= 0.25) {
+      changes.push(
+        afterTrades > beforeTrades
+          ? `Recent trading activity expanded from ${beforeTrades} to ${afterTrades} trades.`
+          : `Recent trading activity contracted from ${beforeTrades} to ${afterTrades} trades.`,
+      );
+    }
+  }
+
+  const beforeActors = payloadNumber(before, "recentActors");
+  const afterActors = payloadNumber(after, "recentActors");
+  if (
+    beforeActors !== null
+    && afterActors !== null
+    && Math.abs(afterActors - beforeActors) >= 3
+  ) {
+    changes.push(
+      afterActors > beforeActors
+        ? `Observed actor breadth increased from ${beforeActors} to ${afterActors} addresses.`
+        : `Observed actor breadth decreased from ${beforeActors} to ${afterActors} addresses.`,
+    );
+  }
+
+  if (!changes.length) {
+    changes.push("A material evidence condition changed since the previous recorded state.");
+  }
+
+  const fallbackWatch =
+    kind === "deteriorated"
+      ? "Watch whether participation stabilizes or holder breadth also begins to weaken."
+      : kind === "recovered"
+        ? "Watch whether the recovery persists through the next observation window."
+        : kind === "verification-lost"
+          ? "Watch whether participation and evidence breadth recover enough to regain verification."
+          : kind === "stress-cleared"
+            ? "Watch whether participation strengthens enough to regain verification or stress returns."
+            : kind === "inactive"
+              ? "Watch for fresh participation, retained ownership, and a new verified assessment before treating this state as reactivated."
+            : kind === "strengthened"
+              ? "Watch whether participation persists through the next observation window."
+              : "Watch the next verified observation for confirmation or reversal.";
+
+  return {
+    observedAt: new Date(current.observed_at).toISOString(),
+    previousObservedAt: new Date(previous.observed_at).toISOString(),
+    from: previous.signal,
+    to: current.signal,
+    kind,
+    label: transitionLabel(kind),
+    whatChanged: changes.slice(0, 5),
+    watchNext: payloadString(after, "watchNext") ?? fallbackWatch,
+    changeKinds: current.change_kind.split(",").filter(Boolean),
+  };
+}
+
+export async function loadPonsTokenTransitions(addresses: string[]) {
+  const unique = [...new Set(addresses.map((address) => address.toLowerCase()))];
+  const transitions = new Map<string, PonsTokenStateTransition>();
+
+  for (let offset = 0; offset < unique.length; offset += 80) {
+    const batch = unique.slice(offset, offset + 80);
+    if (!batch.length) continue;
+
+    const rows = await getD1().prepare(`
+      SELECT *
+      FROM (
+        SELECT
+          token_address,
+          observed_at,
+          signal,
+          eligible,
+          phase,
+          evidence_status,
+          holder_qualified,
+          change_kind,
+          payload_json,
+          ROW_NUMBER() OVER (
+            PARTITION BY token_address
+            ORDER BY observed_at DESC, id DESC
+          ) AS state_rank
+        FROM pons_token_state_history
+        WHERE token_address IN (${batch.map(() => "?").join(",")})
+      )
+      WHERE state_rank <= 2
+      ORDER BY token_address, state_rank
+    `).bind(...batch).all<StoredTokenState>();
+
+    const grouped = new Map<string, StoredTokenState[]>();
+
+    for (const row of rows.results) {
+      const list = grouped.get(row.token_address) ?? [];
+      list.push(row);
+      grouped.set(row.token_address, list);
+    }
+
+    for (const [tokenAddress, states] of grouped) {
+      const current = states.find((row) => Number(row.state_rank) === 1);
+      const previous = states.find((row) => Number(row.state_rank) === 2);
+
+      if (current && previous) {
+        transitions.set(
+          tokenAddress,
+          explainTransition(previous, current),
+        );
+      }
+    }
+  }
+
+  return transitions;
+}
+
 export async function decorateResearch(state: PonsStateResponse, requestedToken?: string, browse?: { pair?: string; phase?: string }) {
   if (requestedToken && /^0x[0-9a-f]{40}$/i.test(requestedToken) && !state.launches.some((l) => l.tokenAddress === requestedToken.toLowerCase())) {
     const [launch] = await archivedLaunches([requestedToken.toLowerCase()], state);
@@ -408,7 +722,7 @@ export async function decorateResearch(state: PonsStateResponse, requestedToken?
   }
   const byAddress = new Map(rows.map((row) => [row.token_address, row]));
   const identities = await cachedTokenIdentities(addresses);
-  return applyResearchPolicy({ ...state,
+  const decorated = applyResearchPolicy({ ...state,
     launches: state.launches.map((launch) => {
       const row = byAddress.get(launch.tokenAddress);
       let evidence: PonsTokenEvidence | null = null;
@@ -418,4 +732,16 @@ export async function decorateResearch(state: PonsStateResponse, requestedToken?
     }),
     tape: state.tape.map((event) => ({ ...event, tokenSymbol: byAddress.get(event.tokenAddress)?.token_symbol || identities.get(event.tokenAddress)?.symbol || "—" })),
   });
+
+  const transitions = await loadPonsTokenTransitions(
+    decorated.launches.map((launch) => launch.tokenAddress),
+  );
+
+  return {
+    ...decorated,
+    launches: decorated.launches.map((launch) => ({
+      ...launch,
+      stateTransition: transitions.get(launch.tokenAddress) ?? null,
+    })),
+  };
 }

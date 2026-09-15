@@ -497,3 +497,53 @@ test("canonical PONS materialization persists sparse per-token state memory", as
   assert.match(live, /decorateResearch\(state\)/);
   assert.match(live, /recordPonsTokenStateHistory\(decorated\)/);
 });
+
+
+test("token state memory exposes deterministic transition explanations", async () => {
+  const [model, researchDb] = await Promise.all([
+    readFile(new URL("../lib/pons/model.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(model, /PonsTokenStateTransition/);
+  assert.match(model, /stateTransition\?: PonsTokenStateTransition \| null/);
+
+  assert.match(researchDb, /loadPonsTokenTransitions/);
+  assert.match(researchDb, /ROW_NUMBER\(\) OVER/);
+  assert.match(researchDb, /WHERE state_rank <= 2/);
+
+  assert.match(researchDb, /return "recovered"/);
+  assert.match(researchDb, /return "verification-lost"/);
+  assert.match(researchDb, /return "stress-cleared"/);
+  assert.match(
+    researchDb,
+    /Sampled holder breadth crossed the verification requirement/
+  );
+  assert.match(
+    researchDb,
+    /Current eligibility requirements are now satisfied/
+  );
+  assert.match(
+    researchDb,
+    /stateTransition: transitions\.get\(launch\.tokenAddress\) \?\? null/
+  );
+});
+
+
+test("transition explanations distinguish inactivity and surface stress reasons", async () => {
+  const [model, researchDb] = await Promise.all([
+    readFile(new URL("../lib/pons/model.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(model, /\| "inactive"/);
+  assert.match(
+    researchDb,
+    /current\.signal === "inactive" && previous\.signal !== "inactive"/
+  );
+  assert.match(
+    researchDb,
+    /case "inactive": return "Participation became inactive"/
+  );
+  assert.match(researchDb, /payloadStrings\(after, "researchReasons"\)/);
+});

@@ -33,6 +33,27 @@ export type PonsPairCohort = {
   attentionScore: number;
 };
 
+export type PonsTokenStateTransition = {
+  observedAt: string;
+  previousObservedAt: string;
+  from: PonsActivitySignal;
+  to: PonsActivitySignal;
+  kind:
+    | "strengthened"
+    | "deteriorated"
+    | "recovered"
+    | "verification-lost"
+    | "stress-cleared"
+    | "inactive"
+    | "lifecycle"
+    | "evidence-update"
+    | "state-change";
+  label: string;
+  whatChanged: string[];
+  watchNext: string;
+  changeKinds: string[];
+};
+
 export type PonsLaunchView = {
   tokenAddress: string;
   curveAddress: string;
@@ -74,6 +95,7 @@ export type PonsLaunchView = {
   creatorSellEvents?: number;
   research?: PonsResearchReading;
   currentEvidence?: PonsTokenEvidence | null;
+  stateTransition?: PonsTokenStateTransition | null;
 };
 
 export type PonsResearchReading = {
