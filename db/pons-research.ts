@@ -43,7 +43,11 @@ export async function researchCandidate(token?: string) {
         SUM(CASE
           WHEN t.block_number > tip.block - ?
             AND t.block_number <= tip.block - ?
-          THEN 1 ELSE 0 END) AS previous_trades
+          THEN 1 ELSE 0 END) AS previous_trades,
+        COUNT(DISTINCT CASE
+          WHEN t.block_number > tip.block - ?
+            AND t.block_number <= tip.block - ?
+          THEN t.actor_address END) AS previous_actors
       FROM pons_curve_trades t
       CROSS JOIN tip
       WHERE t.block_number > tip.block - ?
@@ -72,7 +76,10 @@ export async function researchCandidate(token?: string) {
         WHEN ? IS NOT NULL THEN 0
         WHEN COALESCE(a.recent_trades, 0) >= 12
           AND COALESCE(a.recent_actors, 0) >= 5
-          AND COALESCE(a.previous_trades, 0) >= 6 THEN 0
+          AND COALESCE(a.previous_trades, 0) >= 6
+          AND COALESCE(a.previous_actors, 0) >= 3
+          AND COALESCE(a.recent_trades, 0) * 2 >= COALESCE(a.previous_trades, 0)
+          THEN 0
         WHEN COALESCE(a.recent_trades, 0) >= 12
           AND COALESCE(a.recent_actors, 0) >= 5 THEN 1
         ELSE 2
@@ -85,6 +92,8 @@ export async function researchCandidate(token?: string) {
   `)
     .bind(
       window,
+      window,
+      window * 2,
       window,
       window * 2,
       window,

@@ -396,3 +396,18 @@ test("holder research samples signal windows and schedules two sequential refres
   assert.match(cycle, /intervalMs: 0/);
   assert.match(cycle, /pons-research-\$\{slot \+ 1\}/);
 });
+
+
+test("holder research prioritizes candidates that can still clear the participation policy", async () => {
+  const researchDb = await readFile(
+    new URL("../db/pons-research.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(researchDb, /previous_actors/);
+  assert.match(researchDb, /COALESCE\(a\.previous_actors, 0\) >= 3/);
+  assert.match(
+    researchDb,
+    /COALESCE\(a\.recent_trades, 0\) \* 2 >= COALESCE\(a\.previous_trades, 0\)/
+  );
+});
