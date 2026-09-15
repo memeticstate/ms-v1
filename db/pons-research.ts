@@ -29,6 +29,197 @@ export async function storeTokenEvidence(evidence: PonsTokenEvidence) {
       JSON.stringify(evidence),
     ).run();
 }
+export const PONS_TOKEN_STATE_HEARTBEAT_MS = 60 * 60_000;
+
+type LatestTokenStateRow = {
+  token_address: string;
+  observed_at: number;
+  signal: string;
+  eligible: number;
+  phase: string;
+  evidence_status: string;
+  holder_qualified: number;
+};
+
+export async function recordPonsTokenStateHistory(state: PonsStateResponse) {
+  // A delayed/catching-up index must never manufacture a current state change.
+  if (state.mode !== "live" || state.pulse.status !== "verified") return 0;
+
+  const launches = state.launches.slice(0, 120);
+  if (!launches.length) return 0;
+
+  const db = getD1();
+  const observedAt = Number.isFinite(Date.parse(state.generatedAt))
+    ? Date.parse(state.generatedAt)
+    : Date.now();
+
+  const latest = new Map<string, LatestTokenStateRow>();
+  const addresses = launches.map((launch) => launch.tokenAddress);
+
+  for (let offset = 0; offset < addresses.length; offset += 80) {
+    const batch = addresses.slice(offset, offset + 80);
+    const rows = await db.prepare(`
+      SELECT token_address, observed_at, signal, eligible, phase, evidence_status, holder_qualified
+      FROM (
+        SELECT
+          token_address,
+          observed_at,
+          signal,
+          eligible,
+          phase,
+          evidence_status,
+          holder_qualified,
+          ROW_NUMBER() OVER (
+            PARTITION BY token_address
+            ORDER BY observed_at DESC, id DESC
+          ) AS state_rank
+        FROM pons_token_state_history
+        WHERE token_address IN (${batch.map(() => "?").join(",")})
+      )
+      WHERE state_rank = 1
+    `).bind(...batch).all<LatestTokenStateRow>();
+
+    for (const row of rows.results) latest.set(row.token_address, row);
+  }
+
+  const snapshots = [];
+
+  for (const launch of launches) {
+    const reading = launch.research;
+    const evidence = launch.currentEvidence ?? null;
+
+    const signal = reading?.signal ?? launch.signal;
+    const eligible = Boolean(reading?.eligible);
+    const evidenceStatus = evidence?.status ?? "missing";
+    const holderSampleSize = evidence?.holderSampleSize ?? null;
+    const meaningfulHolders = evidence?.meaningfulHolders ?? null;
+    const holderQualified = Boolean(
+      holderSampleSize !== null
+      && holderSampleSize >= 10
+      && meaningfulHolders !== null
+      && meaningfulHolders >= 10
+    );
+
+    const previous = latest.get(launch.tokenAddress);
+    const changes: string[] = [];
+
+    if (!previous) {
+      changes.push("initial");
+    } else {
+      if (previous.signal !== signal) changes.push("signal");
+      if (Boolean(previous.eligible) !== eligible) changes.push("eligibility");
+      if (previous.phase !== launch.phase) changes.push("lifecycle");
+      if (previous.evidence_status !== evidenceStatus) changes.push("evidence");
+      if (Boolean(previous.holder_qualified) !== holderQualified) changes.push("holder-breadth");
+
+      if (!changes.length && observedAt - previous.observed_at >= PONS_TOKEN_STATE_HEARTBEAT_MS) {
+        changes.push("heartbeat");
+      }
+    }
+
+    if (!changes.length) continue;
+
+    const payload = {
+      tokenAddress: launch.tokenAddress,
+      symbol: launch.symbol,
+      name: launch.name,
+      observedAt: new Date(observedAt).toISOString(),
+      indexedBlock: state.index.latestIndexedBlock,
+      phase: launch.phase,
+      signal,
+      eligible,
+      researchLabel: reading?.label ?? null,
+      researchScore: reading?.score ?? null,
+      researchReasons: reading?.reasons ?? [],
+      watchNext: reading?.next ?? null,
+      recentTrades: launch.recentTrades,
+      previousTrades: launch.previousTrades,
+      recentActors: launch.recentUniqueTraders,
+      previousActors: launch.previousUniqueTraders ?? 0,
+      momentumPercent: launch.momentumPercent,
+      buyShare: launch.buyShare,
+      netQuoteFlow: launch.netQuoteFlow ?? null,
+      peakDrawdownPercent: launch.peakDrawdownPercent ?? null,
+      evidenceStatus,
+      evidenceObservedAt: evidence?.observedAt ?? null,
+      holderSampleSize,
+      meaningfulHolders,
+      holderQualified,
+      largestWalletSharePercent: evidence?.largestWalletSharePercent ?? null,
+      reserveSharePercent: evidence?.reserveSharePercent ?? null,
+      changeKinds: changes,
+    };
+
+    snapshots.push({
+      id: `${launch.tokenAddress}:${observedAt}:${state.index.latestIndexedBlock}`,
+      tokenAddress: launch.tokenAddress,
+      observedAt,
+      indexedBlock: state.index.latestIndexedBlock,
+      phase: launch.phase,
+      signal,
+      eligible,
+      evidenceStatus,
+      holderSampleSize,
+      meaningfulHolders,
+      holderQualified,
+      recentTrades: launch.recentTrades,
+      previousTrades: launch.previousTrades,
+      recentActors: launch.recentUniqueTraders,
+      previousActors: launch.previousUniqueTraders ?? 0,
+      changeKind: changes.join(","),
+      payloadJson: JSON.stringify(payload),
+    });
+  }
+
+  if (!snapshots.length) return 0;
+
+  const statements = snapshots.map((snapshot) => db.prepare(`
+    INSERT OR IGNORE INTO pons_token_state_history (
+      id,
+      token_address,
+      observed_at,
+      indexed_block,
+      phase,
+      signal,
+      eligible,
+      evidence_status,
+      holder_sample_size,
+      meaningful_holders,
+      holder_qualified,
+      recent_trades,
+      previous_trades,
+      recent_actors,
+      previous_actors,
+      change_kind,
+      payload_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    snapshot.id,
+    snapshot.tokenAddress,
+    snapshot.observedAt,
+    snapshot.indexedBlock,
+    snapshot.phase,
+    snapshot.signal,
+    snapshot.eligible,
+    snapshot.evidenceStatus,
+    snapshot.holderSampleSize,
+    snapshot.meaningfulHolders,
+    snapshot.holderQualified,
+    snapshot.recentTrades,
+    snapshot.previousTrades,
+    snapshot.recentActors,
+    snapshot.previousActors,
+    snapshot.changeKind,
+    snapshot.payloadJson,
+  ));
+
+  for (let offset = 0; offset < statements.length; offset += 50) {
+    await db.batch(statements.slice(offset, offset + 50));
+  }
+
+  return snapshots.length;
+}
+
 export async function researchCandidate(token?: string) {
   const requested = token?.toLowerCase() ?? null;
   const window = PONS_SIGNAL_WINDOW_BLOCKS;

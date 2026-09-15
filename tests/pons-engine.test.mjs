@@ -467,3 +467,33 @@ test("automatic holder research stays inside the surfaced live cohort", async ()
     /COALESCE\(a\.window_trades, 0\) DESC/
   );
 });
+
+
+test("canonical PONS materialization persists sparse per-token state memory", async () => {
+  const [schema, researchDb, live] = await Promise.all([
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/pons-live.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /pons_token_state_history/);
+  assert.match(schema, /pons_token_state_history_token_time_idx/);
+
+  assert.match(
+    researchDb,
+    /PONS_TOKEN_STATE_HEARTBEAT_MS = 60 \* 60_000/
+  );
+  assert.match(
+    researchDb,
+    /state\.mode !== "live" \|\| state\.pulse\.status !== "verified"/
+  );
+  assert.match(researchDb, /changes\.push\("signal"\)/);
+  assert.match(researchDb, /changes\.push\("eligibility"\)/);
+  assert.match(researchDb, /changes\.push\("lifecycle"\)/);
+  assert.match(researchDb, /changes\.push\("evidence"\)/);
+  assert.match(researchDb, /changes\.push\("holder-breadth"\)/);
+  assert.match(researchDb, /changes\.push\("heartbeat"\)/);
+
+  assert.match(live, /decorateResearch\(state\)/);
+  assert.match(live, /recordPonsTokenStateHistory\(decorated\)/);
+});

@@ -267,12 +267,23 @@ export async function runRequestPonsCollection(force = false) {
 }
 
 export async function materializePonsState(windowBlocks?: number) {
-  const { acquireAuxJob, releaseAuxJob } = await import("@/db/pons-research");
+  const {
+    acquireAuxJob,
+    releaseAuxJob,
+    decorateResearch,
+    recordPonsTokenStateHistory,
+  } = await import("@/db/pons-research");
   if (!await acquireAuxJob("materialize", 20_000)) return null;
   try {
     const state = await getPonsState(windowBlocks);
     await cachePonsState(state);
     await recordPonsActivitySnapshot(state.index.latestSeenBlock, state);
+
+    // Token memory is derived only from a canonical materialization and uses
+    // the same evidence/research policy shown to users.
+    const decorated = await decorateResearch(state);
+    await recordPonsTokenStateHistory(decorated);
+
     return state;
   } finally { await releaseAuxJob("materialize"); }
 }

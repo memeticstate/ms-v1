@@ -609,6 +609,30 @@ export const ponsTokenResearch = sqliteTable("pons_token_research", {
   payloadJson: text("payload_json").notNull(),
 }, (table) => [index("pons_research_refresh_idx").on(table.refreshAfter)]);
 
+export const ponsTokenStateHistory = sqliteTable("pons_token_state_history", {
+  id: text("id").primaryKey(),
+  tokenAddress: text("token_address").notNull(),
+  observedAt: integer("observed_at").notNull(),
+  indexedBlock: integer("indexed_block").notNull(),
+  phase: text("phase").notNull(),
+  signal: text("signal").notNull(),
+  eligible: integer("eligible", { mode: "boolean" }).notNull(),
+  evidenceStatus: text("evidence_status").notNull(),
+  holderSampleSize: integer("holder_sample_size"),
+  meaningfulHolders: integer("meaningful_holders"),
+  holderQualified: integer("holder_qualified", { mode: "boolean" }).notNull(),
+  recentTrades: integer("recent_trades").notNull(),
+  previousTrades: integer("previous_trades").notNull(),
+  recentActors: integer("recent_actors").notNull(),
+  previousActors: integer("previous_actors").notNull(),
+  changeKind: text("change_kind").notNull(),
+  payloadJson: text("payload_json").notNull(),
+}, (table) => [
+  index("pons_token_state_history_token_time_idx").on(table.tokenAddress, table.observedAt),
+  index("pons_token_state_history_observed_idx").on(table.observedAt),
+  index("pons_token_state_history_signal_idx").on(table.signal, table.observedAt),
+]);
+
 export const premiumSupplyReferences = sqliteTable("premium_supply_references", {
   chainId: integer("chain_id").notNull(),
   contractAddress: text("contract_address").notNull(),

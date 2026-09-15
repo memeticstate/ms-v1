@@ -141,6 +141,13 @@
       "when": 1789028529142,
       "tag": "0019_shocking_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1789496728116,
+      "tag": "0020_motionless_speedball",
+      "breakpoints": true
     }
   ]
 }
