@@ -566,12 +566,17 @@ function ScoreRing({ score, color }: { score: number | null; color: string }) {
   );
 }
 
-function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
+export function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
   const transition = launch.stateTransition;
   if (!transition) return null;
+  const currentSignal = launch.research?.signal ?? launch.signal;
+  const differsFromCurrent = transition.to !== currentSignal;
+  const currentGuidance = launch.research?.next;
 
   const tone =
-    transition.kind === "recovered" || transition.kind === "strengthened"
+    differsFromCurrent
+      ? "var(--culture)"
+      : transition.kind === "recovered" || transition.kind === "strengthened"
       ? "var(--signal)"
       : transition.kind === "deteriorated" || transition.kind === "inactive"
         ? "var(--danger)"
@@ -593,7 +598,7 @@ function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
             className="font-mono text-xs uppercase tracking-[0.17em]"
             style={{ color: tone }}
           >
-            State change
+            Recorded state change
           </p>
           <p className="mt-1 text-sm font-semibold text-foreground/85">
             {transition.label}
@@ -605,21 +610,27 @@ function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
             {transition.from} → {transition.to}
           </p>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            {relativeTime(transition.observedAt)}
+            Recorded {relativeTime(transition.observedAt)}
           </p>
         </div>
       </div>
 
       <div className="px-4 py-4">
+        {differsFromCurrent ? (
+          <p className="mb-4 rounded border border-attention/15 bg-attention/[0.035] px-3 py-2.5 text-xs leading-5 text-foreground/70">
+            The recorded transition ended at <strong>{transition.to.toUpperCase()}</strong>.
+            {" "}The current reading is <strong>{currentSignal.toUpperCase()}</strong>.
+          </p>
+        ) : null}
         {transition.kind === "stress-cleared" ? (
           <div className="mb-4 rounded border border-attention/15 bg-attention/[0.035] px-3 py-2.5 text-xs leading-5 text-foreground/70">
-            The previously measured stress condition is no longer confirmed.
-            This is <strong className="font-semibold text-attention">not yet a verified recovery</strong>.
+            At that observation, the previously measured stress condition was no longer confirmed.
+            The recorded change was <strong className="font-semibold text-attention">not yet a verified recovery</strong>.
           </div>
         ) : null}
 
         <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
-          What changed
+          What changed at that observation
         </p>
 
         <ul className="mt-2.5 space-y-2">
@@ -637,10 +648,10 @@ function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
 
         <div className="mt-4 border-t border-foreground/8 pt-3">
           <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
-            Watch next
+            Watch next · {currentGuidance ? "current reading" : "recorded guidance"}
           </p>
           <p className="mt-2 text-xs leading-5 text-foreground/65">
-            {transition.watchNext}
+            {currentGuidance ?? transition.watchNext}
           </p>
         </div>
       </div>

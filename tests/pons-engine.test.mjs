@@ -559,7 +559,7 @@ test("launch dossier exposes persistent token state changes without overstating 
   assert.ok(
     observatory.includes("launch.stateTransition")
   );
-  assert.match(observatory, /State change/);
+  assert.match(observatory, /Recorded state change/);
   assert.match(observatory, /What changed/);
   assert.match(observatory, /Watch next/);
   assert.match(observatory, /not yet a verified recovery/);

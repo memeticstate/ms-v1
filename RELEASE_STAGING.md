@@ -3,7 +3,9 @@
 Base: `infra/cloudflare-staging-v62` at `e4d30bc6eefe65b370cdb4df5ac32a26ac5d84fc`.
 Review branch: `work/simple-experience-v62`. Target: `infra/cloudflare-staging-v62`.
 
-This change is implemented and locally verified. It has not been deployed to the staging Worker or production.
+The Simple v62 redesign was merged in PR #2 at `3489a483bd9fa0061a8dc8cfdadc75823103f30c` and deployed by the owner to `memetic-state-staging`. Wrangler reported version `313ac889-7414-41c0-85f8-59af3af6aad1` on 2026-09-15. Production has not been cut over.
+
+This v62.1 follow-up fixes a live review finding: a recorded transition could describe historical eligibility as if it were the current reading. Token Brief and the Observatory now explicitly distinguish recorded state from current state and prefer current research guidance. This follow-up is locally verified and awaits staging deployment.
 
 ## Release ledger
 
@@ -33,23 +35,32 @@ The RPC collector, deterministic classifier, D1 schema, production hosting confi
 ## Completed verification
 
 - Existing lockfile installation succeeded without dependency changes.
-- `npm test`: production build succeeded; **179 tests passed, zero failed**.
+- `npm test`: production build succeeded; **180 tests passed, zero failed**.
 - `npx tsc --noEmit --incremental false`: passed.
 - `git diff --check`: passed.
 - Added executable regression coverage for navigation, rendered routes, legacy links, state-history queries, stress/recovery, freshness, sampled holders, unknown baselines, raw flow direction, Watchtower state validation, and explorer/API separation.
 - Production Wrangler configuration, RPC transport, deterministic research classifier, dependency versions and D1 migrations are unchanged.
 
-## Required staging review — still pending
+## Live staging review — 2026-09-15
 
-1. Deploy this branch to `memetic-state-staging` only. The compiled deployment configuration is `dist/server/wrangler.json` and the expected public staging origin is `https://memetic-state-staging.memeticstate.workers.dev`.
-2. Capture desktop and approximately 390px mobile screenshots of Simple NOW, CHANGED, Token Brief, and the advanced Observatory. Review wrapping, tap targets, scrolling, search, drawers and navigation on the actual deployment.
-3. Smoke-test Privy wallet/email/Google login, below-threshold denial, 0.1% holder access, access expiry and refresh, Research, and Save/account restore.
-4. Compare visible deterministic readings against the existing canonical evidence on the same tokens and observation blocks.
-5. Observe collector freshness and persistent state memory for several hours.
-6. Verify rendered external explorer links, including saved research and wallet UI, use Robinhood Etherscan.
+- Desktop Simple NOW, CHANGED, NEW and token search rendered successfully. Exact contract selection opened the intended Token Brief.
+- Token Brief, Observatory dossier, Research and Saved preserved the selected token. Advanced evidence disclosed holder sampling and dated state history.
+- A local watch was saved, survived reload, and was removed successfully. This does not verify authenticated account restore.
+- Research displayed the 0.1% holder access requirement. Privy opened and offered wallet/email/social methods; authenticated entitlement checks remain pending.
+- Inspected token, contract, transaction, block, creator and protocol coverage links used `https://robin.etherscan.io`.
+- Collector timestamps and launch blocks advanced during the review; state memory showed four of five horizons resolved, with the 7-day horizon warming. Three hourly public UI spot checks were scheduled; uninterrupted collector health is not yet established.
+- Desktop screenshots capture deployed v62, before this presentation follow-up. Mobile visual review remains pending because the available browser did not support a mobile viewport.
+- Independent automated API checks were denied by Cloudflare with HTTP 403 / Error 1010 and stopped. Full parity on identical observation blocks, authenticated API denial and access tests have not been completed.
 
-The user explicitly approved publishing these changes to `memeticstate/ms-v1` on `work/simple-experience-v62`. GitHub write access was rechecked and is now enabled (`push: true`); the initial publication blocker has been resolved.
+## Remaining release gates
 
-Cloudflare deployment credentials were unavailable in this Work session. Browser policy blocked the local preview and shared-file preview, so no screenshots or live authentication/soak results are claimed. The production build and executable tests were verified separately from browser review.
+1. Deploy and review the v62.1 presentation follow-up on `memetic-state-staging` only.
+2. Review approximately 390px mobile layouts, tap targets, drawers and scrolling.
+3. Complete Privy wallet/email/Google login, below-threshold denial, 0.1% holder access, access expiry/refresh, Research and authenticated Save/account restore.
+4. Compare deterministic readings against canonical evidence for identical tokens and observation blocks through an authorized client.
+5. Finish collector freshness and persistent state-memory soak; UI spot checks alone do not establish continuous health.
+6. Verify explorer destinations in authenticated saved research and wallet UI.
 
-`memeticstate.com`, its DNS, the existing ChatGPT Sites production, and the running staging deployment were left unchanged. Production-domain cutover remains a separate later release decision after the checks above pass.
+The staging-only portable package passed Wrangler 4.132.0 dry run. No database migration, dependency change, RPC transport change, classifier change or production-domain configuration change is included.
+
+`memeticstate.com`, its DNS and the existing ChatGPT Sites production remain outside this release. Production-domain cutover is a separate later decision after the checks above pass.

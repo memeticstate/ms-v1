@@ -14,10 +14,27 @@ import { selectedLaunch } from '@/lib/pons/navigation';
 import { createWatchEntry, parseWatchlist, WATCHLIST_STORAGE_KEY } from '@/lib/pons/watchlist';
 import { tokenAddress, shortTokenAddress, tokenText } from '@/lib/tokens/model';
 import { robinhoodExplorer } from '@/lib/robinhood-explorer';
+import type { PonsLaunchView } from '@/lib/pons/model';
 import styles from './simple-experience.module.css';
 
 function Detail({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return <details className={styles.detail}><summary><span>{title}<small>{note}</small></span><Plus size={17} /></summary><div className={styles.detailBody}>{children}</div></details>;
+}
+
+export function BriefStateChange({ launch, now }: { launch: PonsLaunchView; now: number }) {
+  const transition = launch.stateTransition;
+  if (!transition) return null;
+  const currentSignal = launch.research?.signal ?? launch.signal;
+  return <>
+    <div className={styles.briefTransition}>
+      <span>{transition.from.toUpperCase()} <ArrowRight size={15} /> {transition.to.toUpperCase()}</span>
+      <span>Recorded {relativeTime(transition.observedAt, now)}</span>
+      <p>Recorded state change: {transitionCopy(transition)}</p>
+    </div>
+    {transition.to !== currentSignal ? <p className={styles.notice}>
+      The recorded transition ended at <strong>{transition.to.toUpperCase()}</strong>. The current reading is <strong>{currentSignal.toUpperCase()}</strong>.
+    </p> : null}
+  </>;
 }
 
 function BriefContent({ address }: { address: string }) {
@@ -126,7 +143,7 @@ function BriefContent({ address }: { address: string }) {
     <section className={styles.briefHero}>
       <div className={styles.briefIdentity}><TokenAvatar token={launch} className={styles.briefAvatar} /><div><h1>{title.replace(/^\$/, '')}</h1><p>{launch.name} <span>· {launch.pairSymbol === 'WETH' ? 'ETH' : launch.pairSymbol} HABITAT</span></p></div><StateLabel signal={launch.signal} delayed={!fresh} /></div>
       <p className={styles.briefReading}>{launch.research?.label ?? 'Current participation is unverified.'}</p>
-      {transition ? <div className={styles.briefTransition}><span>{transition.from.toUpperCase()} <ArrowRight size={15} /> {transition.to.toUpperCase()}</span><span>{relativeTime(transition.observedAt, now)}</span><p>{transitionCopy(transition)}</p></div> : <p className={styles.noTransition}>No earlier state change has been recorded.</p>}
+      {transition ? <BriefStateChange launch={launch} now={now} /> : <p className={styles.noTransition}>No earlier state change has been recorded.</p>}
       {!fresh ? <p className={styles.notice} role="status">These are the last recorded observations. Current participation is not confirmed. <button onClick={refresh}>Refresh evidence</button></p> : null}
     </section>
     <section className={styles.briefMetrics} aria-label="Primary evidence">
@@ -137,8 +154,8 @@ function BriefContent({ address }: { address: string }) {
     </section>
     <div className={styles.briefColumns}>
       <div className={styles.briefEditorial}>
-        <section><p className={styles.sectionNumber}>01 / THE CHANGE</p><h2>What changed</h2>{transition ? <ul>{transition.whatChanged.slice(0, 3).map((reason, i) => <li key={i}>{reason}</li>)}</ul> : <><p>No transition is recorded yet. The current reading is based on:</p><ul>{(launch.research?.reasons ?? [launch.signalNote]).slice(0, 2).map((reason, i) => <li key={i}>{reason}</li>)}</ul></>}</section>
-        <section className={styles.watchNext}><p className={styles.sectionNumber}>02 / NEXT OBSERVATION</p><h2>Watch next</h2><p>{(transition?.to === launch.signal ? transition.watchNext : null) ?? launch.research?.next ?? 'Wait for a current observation before drawing a conclusion.'}</p></section>
+        <section><p className={styles.sectionNumber}>01 / THE CHANGE</p><h2>What changed</h2>{transition ? <><p>At the recorded observation · {relativeTime(transition.observedAt, now)}:</p><ul>{transition.whatChanged.slice(0, 3).map((reason, i) => <li key={i}>{reason}</li>)}</ul></> : <><p>No transition is recorded yet. The current reading is based on:</p><ul>{(launch.research?.reasons ?? [launch.signalNote]).slice(0, 2).map((reason, i) => <li key={i}>{reason}</li>)}</ul></>}</section>
+        <section className={styles.watchNext}><p className={styles.sectionNumber}>02 / {launch.research?.next ? 'CURRENT GUIDANCE' : 'RECORDED GUIDANCE'}</p><h2>Watch next</h2><p>{launch.research?.next ?? transition?.watchNext ?? 'Wait for a current observation before drawing a conclusion.'}</p></section>
       </div>
       <aside className={styles.evidenceColumn}><p className={styles.sectionNumber}>SOURCE COVERAGE</p><h2>What we know</h2><dl className={styles.coverage}>{coverage.map(([label, value, present]) => <div key={label}><dt>{label}</dt><dd data-present={present}>{present ? <Check size={13} /> : <span>—</span>}{value}</dd></div>)}</dl><p className={styles.coverageNote}>System readings follow recorded evidence. AI interpretation is available in Research.</p></aside>
     </div>
