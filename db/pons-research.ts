@@ -5,6 +5,9 @@ import { PONS_SIGNAL_WINDOW_BLOCKS, ponsMomentumPercent } from "@/lib/pons/signa
 import { applyResearchPolicy } from "@/lib/pons/research";
 import { cachedTokenIdentities } from "@/db/token-discovery";
 
+export const PONS_HOLDER_REFRESH_MS = 8 * 60_000;
+export const PONS_HOLDER_RETRY_MS = 3 * 60_000;
+
 export async function acquireAuxJob(id: string, intervalMs = 30_000) {
   const db = getD1(), now = Date.now();
   await db.prepare("INSERT OR IGNORE INTO pons_aux_jobs (id, locked_until, next_at) VALUES (?, 0, 0)").bind(id).run();
@@ -19,7 +22,12 @@ export async function storeTokenEvidence(evidence: PonsTokenEvidence) {
   const now = Date.now();
   await getD1().prepare(`INSERT INTO pons_token_research (token_address, checked_at, refresh_after, payload_json) VALUES (?, ?, ?, ?)
     ON CONFLICT(token_address) DO UPDATE SET checked_at = excluded.checked_at, refresh_after = excluded.refresh_after, payload_json = excluded.payload_json`)
-    .bind(evidence.tokenAddress, now, now + (evidence.observedAt ? 300_000 : 60_000), JSON.stringify(evidence)).run();
+    .bind(
+      evidence.tokenAddress,
+      now,
+      now + (evidence.observedAt ? PONS_HOLDER_REFRESH_MS : PONS_HOLDER_RETRY_MS),
+      JSON.stringify(evidence),
+    ).run();
 }
 export async function researchCandidate(token?: string) {
   const requested = token?.toLowerCase() ?? null;
@@ -34,6 +42,8 @@ export async function researchCandidate(token?: string) {
     activity AS (
       SELECT
         t.token_address,
+        COUNT(*) AS window_trades,
+        COUNT(DISTINCT t.actor_address) AS window_actors,
         SUM(CASE
           WHEN t.block_number > tip.block - ?
           THEN 1 ELSE 0 END) AS recent_trades,
@@ -52,6 +62,19 @@ export async function researchCandidate(token?: string) {
       CROSS JOIN tip
       WHERE t.block_number > tip.block - ?
       GROUP BY t.token_address
+    ),
+    surfaced AS MATERIALIZED (
+      SELECT l.token_address
+      FROM pons_launches l
+      CROSS JOIN tip
+      LEFT JOIN activity a ON a.token_address = l.token_address
+      WHERE l.block_number <= tip.block
+      ORDER BY
+        COALESCE(a.recent_trades, 0) DESC,
+        COALESCE(a.window_trades, 0) DESC,
+        COALESCE(a.window_actors, 0) DESC,
+        l.block_number DESC
+      LIMIT 120
     )
     SELECT
       l.token_address,
@@ -71,22 +94,21 @@ export async function researchCandidate(token?: string) {
           AND e.event_type IN ('graduation', 'sweep')
           AND e.block_number <= tip.block
       )
-    ORDER BY
-      CASE
-        WHEN ? IS NOT NULL THEN 0
-        WHEN COALESCE(a.recent_trades, 0) >= 12
+      AND (
+        ? IS NOT NULL
+        OR (
+          l.token_address IN (SELECT token_address FROM surfaced)
+          AND COALESCE(a.recent_trades, 0) >= 12
           AND COALESCE(a.recent_actors, 0) >= 5
           AND COALESCE(a.previous_trades, 0) >= 6
           AND COALESCE(a.previous_actors, 0) >= 3
           AND COALESCE(a.recent_trades, 0) * 2 >= COALESCE(a.previous_trades, 0)
-          THEN 0
-        WHEN COALESCE(a.recent_trades, 0) >= 12
-          AND COALESCE(a.recent_actors, 0) >= 5 THEN 1
-        ELSE 2
-      END,
-      COALESCE(r.checked_at, 0) ASC,
+        )
+      )
+    ORDER BY
       COALESCE(a.recent_trades, 0) DESC,
       COALESCE(a.recent_actors, 0) DESC,
+      COALESCE(r.checked_at, 0) ASC,
       l.block_number DESC
     LIMIT 1
   `)

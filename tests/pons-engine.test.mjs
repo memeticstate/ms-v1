@@ -339,7 +339,7 @@ test("scheduled holder research follows live attention instead of scanning launc
 });
 
 
-test("holder research rotates fairly and deepens samples through bounded RPC chunks", async () => {
+test("holder research follows the live edge and deepens samples through bounded RPC chunks", async () => {
   const [researchDb, researchIngestion, rpc] = await Promise.all([
     readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/ingestion/pons-research.ts", import.meta.url), "utf8"),
@@ -348,9 +348,9 @@ test("holder research rotates fairly and deepens samples through bounded RPC chu
 
   assert.match(researchDb, /GROUP BY t\.actor_address/);
   assert.match(researchDb, /LIMIT 48/);
-  assert.ok(
-    researchDb.indexOf("COALESCE(r.checked_at, 0) ASC") <
-    researchDb.indexOf("COALESCE(a.recent_trades, 0) DESC")
+  assert.match(
+    researchDb,
+    /ORDER BY\s+COALESCE\(a\.recent_trades, 0\) DESC,\s+COALESCE\(a\.recent_actors, 0\) DESC,\s+COALESCE\(r\.checked_at, 0\) ASC,\s+l\.block_number DESC/
   );
   assert.match(researchIngestion, /HOLDER_RPC_CHUNK_REQUESTS = 24/);
   assert.match(researchIngestion, /holderDeadline/);
@@ -409,5 +409,61 @@ test("holder research prioritizes candidates that can still clear the participat
   assert.match(
     researchDb,
     /COALESCE\(a\.recent_trades, 0\) \* 2 >= COALESCE\(a\.previous_trades, 0\)/
+  );
+});
+
+
+test("holder evidence refresh cadence uses the freshness window efficiently", async () => {
+  const researchDb = await readFile(
+    new URL("../db/pons-research.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(researchDb, /PONS_HOLDER_REFRESH_MS = 8 \* 60_000/);
+  assert.match(researchDb, /PONS_HOLDER_RETRY_MS = 3 \* 60_000/);
+  assert.match(
+    researchDb,
+    /evidence\.observedAt \? PONS_HOLDER_REFRESH_MS : PONS_HOLDER_RETRY_MS/
+  );
+});
+
+
+test("automatic holder research excludes tokens that cannot currently qualify", async () => {
+  const researchDb = await readFile(
+    new URL("../db/pons-research.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(researchDb, /\? IS NOT NULL\s+OR \(/);
+  assert.match(researchDb, /COALESCE\(a\.recent_trades, 0\) >= 12/);
+  assert.match(researchDb, /COALESCE\(a\.recent_actors, 0\) >= 5/);
+  assert.match(researchDb, /COALESCE\(a\.previous_trades, 0\) >= 6/);
+  assert.match(researchDb, /COALESCE\(a\.previous_actors, 0\) >= 3/);
+  assert.match(
+    researchDb,
+    /COALESCE\(a\.recent_trades, 0\) \* 2 >= COALESCE\(a\.previous_trades, 0\)/
+  );
+});
+
+
+test("automatic holder research stays inside the surfaced live cohort", async () => {
+  const researchDb = await readFile(
+    new URL("../db/pons-research.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(researchDb, /surfaced AS MATERIALIZED/);
+  assert.match(researchDb, /LIMIT 120/);
+  assert.match(
+    researchDb,
+    /l\.token_address IN \(SELECT token_address FROM surfaced\)/
+  );
+  assert.match(
+    researchDb,
+    /COALESCE\(a\.recent_trades, 0\) DESC/
+  );
+  assert.match(
+    researchDb,
+    /COALESCE\(a\.window_trades, 0\) DESC/
   );
 });
