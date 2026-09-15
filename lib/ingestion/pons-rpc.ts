@@ -426,8 +426,13 @@ async function requestLogFiltersAdaptive(
   }
 }
 
-export async function readPonsContracts(requests: RpcRequest[]) {
-  const { value, provider } = await withProvider((candidate) => postBatch(candidate, requests, true));
+export async function readPonsContracts(requests: RpcRequest[], deadline = Infinity) {
+  const { value, provider } = await withProvider(
+    (candidate) => postBatch(candidate, requests, true, deadline),
+    false,
+    0,
+    deadline,
+  );
   return { envelopes: value.envelopes, provider: provider.name };
 }
 

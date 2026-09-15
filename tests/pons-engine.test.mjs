@@ -320,3 +320,39 @@ test("scheduled PONS commits refresh the durable state inside the freshness wind
   assert.match(cycle, /pons-materialize/);
   assert.match(research, /age\(state\.generatedAt/);
 });
+
+
+test("scheduled holder research follows live attention instead of scanning launches blindly", async () => {
+  const [researchDb, cycle] = await Promise.all([
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/collector-cycle.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(researchDb, /recent_trades/);
+  assert.match(researchDb, /recent_actors/);
+  assert.match(researchDb, /previous_trades/);
+  assert.match(researchDb, /graduation/);
+  assert.match(researchDb, /sweep/);
+  assert.match(cycle, /withScheduledResearch/);
+  assert.match(cycle, /pons-research/);
+  assert.match(cycle, /runTokenResearch/);
+});
+
+
+test("holder research rotates fairly and deepens samples through bounded RPC chunks", async () => {
+  const [researchDb, researchIngestion, rpc] = await Promise.all([
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/pons-rpc.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(researchDb, /GROUP BY actor_address LIMIT 48/);
+  assert.ok(
+    researchDb.indexOf("COALESCE(r.checked_at, 0) ASC") <
+    researchDb.indexOf("COALESCE(a.recent_trades, 0) DESC")
+  );
+  assert.match(researchIngestion, /HOLDER_RPC_CHUNK_REQUESTS = 24/);
+  assert.match(researchIngestion, /holderDeadline/);
+  assert.match(researchIngestion, /holder_sample_budget_exhausted/);
+  assert.match(rpc, /readPonsContracts\(requests: RpcRequest\[\], deadline = Infinity\)/);
+});

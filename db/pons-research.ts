@@ -22,19 +22,85 @@ export async function storeTokenEvidence(evidence: PonsTokenEvidence) {
     .bind(evidence.tokenAddress, now, now + (evidence.observedAt ? 300_000 : 60_000), JSON.stringify(evidence)).run();
 }
 export async function researchCandidate(token?: string) {
-  return getD1().prepare(`SELECT l.token_address, l.curve_address, l.deployer_address FROM pons_launches l
+  const requested = token?.toLowerCase() ?? null;
+  const window = PONS_SIGNAL_WINDOW_BLOCKS;
+
+  return getD1().prepare(`
+    WITH tip AS (
+      SELECT latest_safe_block AS block
+      FROM pons_index_state
+      WHERE id = 'pons-v2'
+    ),
+    activity AS (
+      SELECT
+        t.token_address,
+        SUM(CASE
+          WHEN t.block_number > tip.block - ?
+          THEN 1 ELSE 0 END) AS recent_trades,
+        COUNT(DISTINCT CASE
+          WHEN t.block_number > tip.block - ?
+          THEN t.actor_address END) AS recent_actors,
+        SUM(CASE
+          WHEN t.block_number > tip.block - ?
+            AND t.block_number <= tip.block - ?
+          THEN 1 ELSE 0 END) AS previous_trades
+      FROM pons_curve_trades t
+      CROSS JOIN tip
+      WHERE t.block_number > tip.block - ?
+      GROUP BY t.token_address
+    )
+    SELECT
+      l.token_address,
+      l.curve_address,
+      l.deployer_address
+    FROM pons_launches l
+    CROSS JOIN tip
+    LEFT JOIN activity a ON a.token_address = l.token_address
     LEFT JOIN pons_token_research r ON r.token_address = l.token_address
-    WHERE (? IS NULL OR l.token_address = ?) AND (r.refresh_after IS NULL OR r.refresh_after <= ?)
-      AND l.block_number <= COALESCE((SELECT latest_safe_block FROM pons_index_state WHERE id = 'pons-v2'), 0)
-    ORDER BY COALESCE(r.checked_at, 0), l.block_number DESC LIMIT 1`)
-    .bind(token ?? null, token ?? null, Date.now())
+    WHERE (? IS NULL OR l.token_address = ?)
+      AND (r.refresh_after IS NULL OR r.refresh_after <= ?)
+      AND l.block_number <= tip.block
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pons_events e
+        WHERE e.token_address = l.token_address
+          AND e.event_type IN ('graduation', 'sweep')
+          AND e.block_number <= tip.block
+      )
+    ORDER BY
+      CASE
+        WHEN ? IS NOT NULL THEN 0
+        WHEN COALESCE(a.recent_trades, 0) >= 12
+          AND COALESCE(a.recent_actors, 0) >= 5
+          AND COALESCE(a.previous_trades, 0) >= 6 THEN 0
+        WHEN COALESCE(a.recent_trades, 0) >= 12
+          AND COALESCE(a.recent_actors, 0) >= 5 THEN 1
+        ELSE 2
+      END,
+      COALESCE(r.checked_at, 0) ASC,
+      COALESCE(a.recent_trades, 0) DESC,
+      COALESCE(a.recent_actors, 0) DESC,
+      l.block_number DESC
+    LIMIT 1
+  `)
+    .bind(
+      window,
+      window,
+      window * 2,
+      window,
+      window * 2,
+      requested,
+      requested,
+      Date.now(),
+      requested,
+    )
     .first<{ token_address: string; curve_address: string; deployer_address: string }>();
 }
 export async function recentTokenActors(token: string) {
   // Bound the scan before grouping. Never scan every trade to resolve a name.
   const rows = await getD1().prepare(`SELECT actor_address FROM (
     SELECT actor_address FROM pons_curve_trades WHERE token_address = ? ORDER BY block_number DESC LIMIT 300
-    ) GROUP BY actor_address LIMIT 24`).bind(token).all<{ actor_address: string }>();
+    ) GROUP BY actor_address LIMIT 48`).bind(token).all<{ actor_address: string }>();
   return rows.results.map((r) => r.actor_address);
 }
 async function archivedLaunches(addresses: string[], state: PonsStateResponse): Promise<PonsLaunchView[]> {

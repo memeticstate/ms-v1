@@ -16,6 +16,7 @@ const ABI = parseAbi([
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const ZERO = "0x0000000000000000000000000000000000000000";
 const BURN = "0x000000000000000000000000000000000000dead";
+const HOLDER_RPC_CHUNK_REQUESTS = 24;
 function raw(value: unknown) { try { return typeof value === "string" && /^0x[0-9a-f]+$/i.test(value) ? BigInt(value) : null; } catch { return null; } }
 function percent(value: bigint, supply: bigint) { return Number(value * 1_000_000n / supply) / 10_000; }
 function text(value: unknown) { return typeof value === "string" ? decodeAbiString(value)?.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 96) || null : null; }
@@ -95,8 +96,39 @@ export async function runTokenResearch(token?: string) {
         { jsonrpc: "2.0", id: i * 2, method: "eth_call", params: [{ to: address, data: encodeFunctionData({ abi: ABI, functionName: "balanceOf", args: [wallet as `0x${string}`] }) }, block] },
         { jsonrpc: "2.0", id: i * 2 + 1, method: "eth_getCode", params: [wallet, block] },
       ]);
-      const balances = await readPonsContracts(requests);
-      const mapped = new Map(balances.envelopes.filter((r) => !r.error).map((r) => [r.id, r.result]));
+      const holderDeadline = startedAt + 20_000;
+      const holderEnvelopes = [];
+      let holderRequestsProcessed = 0;
+
+      for (let offset = 0; offset < requests.length; offset += HOLDER_RPC_CHUNK_REQUESTS) {
+        if (Date.now() >= holderDeadline) {
+          evidence.errors.push("holder_sample_budget_exhausted");
+          break;
+        }
+
+        const chunk = requests.slice(offset, offset + HOLDER_RPC_CHUNK_REQUESTS);
+        try {
+          const balances = await readPonsContracts(chunk, holderDeadline);
+          holderEnvelopes.push(...balances.envelopes);
+          holderRequestsProcessed += chunk.length;
+        } catch (error) {
+          evidence.errors.push(
+            error instanceof Error
+              ? `holder_chunk_${error.message.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60)}`
+              : "holder_chunk_unavailable"
+          );
+          break;
+        }
+      }
+
+      if (holderRequestsProcessed < requests.length
+        && !evidence.errors.includes("holder_sample_budget_exhausted")) {
+        evidence.errors.push("holder_sample_partial");
+      }
+
+      const mapped = new Map(
+        holderEnvelopes.filter((r) => !r.error).map((r) => [r.id, r.result])
+      );
       let reserve = 0n, completeReserves = true;
       const shares: number[] = [];
       wallets.forEach((wallet, i) => {
