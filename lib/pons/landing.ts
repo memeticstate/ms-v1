@@ -1,5 +1,6 @@
 import type { PonsActivitySignal, PonsLaunchView, PonsStateResponse } from "./model";
 import { assessLaunch, currentPonsEvidence } from "./research";
+import { appTokenHref, legacyAppDestination } from "../app-navigation";
 
 export type LandingSignal = {
   launch: PonsLaunchView;
@@ -105,8 +106,7 @@ export function isTokenAddress(value: string) {
 }
 
 export function tokenAppHref(address: string) {
-  if (!isTokenAddress(address)) return "/app";
-  return `/app?view=signals&token=${encodeURIComponent(address.toLowerCase())}&inspect=1`;
+  return appTokenHref("brief", address);
 }
 
 export function legacyAppHref(params: Record<string, string | string[] | undefined>) {
@@ -115,5 +115,5 @@ export function legacyAppHref(params: Record<string, string | string[] | undefin
   for (const [key, value] of Object.entries(params)) {
     for (const part of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, part);
   }
-  return `/app?${query.toString()}`;
+  return legacyAppDestination(query.toString());
 }

@@ -14,7 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { PonsLaunchView } from "@/lib/pons/model";
+import type { PonsLaunchView, PonsTokenStateTransition } from "@/lib/pons/model";
+import { appTokenHref } from "@/lib/app-navigation";
 import type { WatchEntry, WatchRules } from "@/lib/pons/watchlist";
 
 const integer = new Intl.NumberFormat("en-US");
@@ -40,7 +41,7 @@ function RuleSwitch({ label, checked, onCheckedChange }: { label: string; checke
   );
 }
 
-export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, onRemove, onReadAll, storageMode = "device", syncMessage = null }: {
+export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, onRemove, onReadAll, storageMode = "device", syncMessage = null, transitions = {}, transitionError = null }: {
   entries: WatchEntry[];
   launches: PonsLaunchView[];
   onInspect: (launch: PonsLaunchView) => void;
@@ -49,6 +50,8 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
   onReadAll: () => void;
   storageMode?: "device" | "passport";
   syncMessage?: string | null;
+  transitions?: Record<string, PonsTokenStateTransition>;
+  transitionError?: string | null;
 }) {
   const launchesByAddress = new Map(launches.map((launch) => [launch.tokenAddress.toLowerCase(), launch]));
   const unread = entries.reduce((total, entry) => total + entry.alerts.filter((item) => !item.read).length, 0);
@@ -60,13 +63,14 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
 
   if (!entries.length) {
     return (
-      <section className="watchlist-empty grid min-h-[520px] place-items-center overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/86 px-5 py-16 text-center">
+      <section className="watchlist-empty grid min-h-[280px] place-items-center overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/86 px-5 py-10 text-center">
         <div className="max-w-xl">
           <div className="mx-auto grid size-16 place-items-center rounded-full border border-attention/20 bg-attention/[0.045]"><Bookmark className="size-6 text-attention" /></div>
           <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-attention">Research watchlist</p>
           <h2 className="specimen-serif mt-3 text-4xl tracking-[-0.035em] text-foreground/88">Save the launches you would otherwise keep checking manually.</h2>
-          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-muted-foreground">Open a launch in Signals or Atlas and select <strong className="font-medium text-muted-foreground">Save research</strong>. Memetic State will compare each new verified pulse against your rules while this observatory is open.</p>
-          <p className="mt-5 font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{storageMode === "passport" ? "Passport ready · your next five field notes can persist across devices" : "Saved on this device · sign in from Network to add cross-device slots"}</p>
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-muted-foreground">Open a token and save it to Watchtower. Return here to see its recorded state changes and tune your watch rules.</p>
+          <a href="/app" className="mt-4 inline-flex rounded border border-attention/30 px-4 py-2 text-sm text-attention">See what matters now</a>
+          <p className="mt-5 text-xs text-muted-foreground">{storageMode === "passport" ? "Passport ready · your next five watches can persist across devices" : "Saved on this device · connect a wallet for cross-device slots"}</p>
         </div>
       </section>
     );
@@ -90,10 +94,13 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
       </section>
 
       {syncMessage ? <div role="status" className="rounded border border-culture/14 bg-culture/[0.025] px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-culture/75">{syncMessage}</div> : null}
+      {transitionError ? <p role="status" className="rounded border border-attention/20 p-3 text-sm text-attention">{transitionError}</p> : null}
 
       <div className="grid gap-3 xl:grid-cols-2">
         {entries.map((entry) => {
           const launch = launchesByAddress.get(entry.tokenAddress.toLowerCase());
+          const persistedTransition = transitions[entry.tokenAddress.toLowerCase()];
+          const transition = persistedTransition && (!launch?.stateTransition || Date.parse(persistedTransition.observedAt) > Date.parse(launch.stateTransition.observedAt)) ? persistedTransition : launch?.stateTransition;
           const unreadAlerts = entry.alerts.filter((item) => !item.read);
           return (
             <article key={entry.tokenAddress} className="watch-card relative overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/88">
@@ -101,7 +108,7 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
               <div className="flex items-start justify-between gap-4 border-b border-foreground/8 p-4 sm:p-5">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2"><span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.12em]" style={{ color: entry.pairColor, borderColor: `color-mix(in srgb, ${entry.pairColor} 30%, transparent)`, backgroundColor: `color-mix(in srgb, ${entry.pairColor} 6%, transparent)` }}>{entry.pairSymbol} habitat</span>{unreadAlerts.length ? <span className="inline-flex items-center gap-1.5 rounded border border-signal/20 bg-signal/[0.035] px-2 py-1 font-mono text-xs uppercase tracking-[0.1em] text-signal"><i className="size-1 rounded-full bg-current" />{unreadAlerts.length} new</span> : null}</div>
-                  <h3 className="mt-3 truncate text-lg font-semibold text-foreground/80">{entry.name}</h3>
+                  <h3 className="mt-3 truncate text-lg font-semibold text-foreground/80"><a href={appTokenHref("brief", entry.tokenAddress)} className="hover:underline">{entry.symbol && entry.symbol !== "—" ? entry.symbol : entry.name}</a></h3>
                   <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{entry.symbol} · saved {relativeTime(entry.savedAt)}</p>
                 </div>
                 <div className="flex gap-1.5">
@@ -110,9 +117,15 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
                 </div>
               </div>
 
+              {transition ? <div className="border-b border-foreground/10 px-4 py-3 sm:px-5" aria-label="Saved token state change">
+                <p className={`text-sm font-semibold ${transition.kind === "deteriorated" || transition.kind === "inactive" ? "text-danger" : "text-foreground"}`}>{transition.label}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{transition.from} → {transition.to} · recorded {relativeTime(transition.observedAt)}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{transition.whatChanged.slice(0, 2).join(" ")}</p>
+              </div> : null}
+
               <div className="grid grid-cols-2 gap-px bg-foreground/[0.07] sm:grid-cols-4">
                 {[
-                  ["Signal", launch?.signal ?? entry.lastSeen.signal],
+                  [launch ? "Window signal" : "Last saved signal", launch?.signal ?? entry.lastSeen.signal],
                   ["Recent trades", integer.format(launch?.recentTrades ?? entry.lastSeen.recentTrades)],
                   ["Momentum", `${launch?.momentumPercent ?? entry.lastSeen.momentumPercent ?? "—"}%`],
                   ["Lifecycle", launch?.phase ?? entry.lastSeen.phase],

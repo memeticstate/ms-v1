@@ -1,16 +1,16 @@
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 import type { TokenSearchResult } from "@/lib/tokens/model";
 import type { ResearchDossier } from "@/lib/premium/research";
 import { recentCurveIsFresh, type RecentCurveCheck } from "@/lib/premium/recent-curve";
 import type { ResearchSource } from "./model";
 
-const explorer = "https://robinhoodchain.blockscout.com";
 export function recentTimestamp(value: string | null | undefined, now = Date.now(), maxAge = 120_000) {
   const age = value ? now - Date.parse(value) : NaN;
   return Number.isFinite(age) && age >= -30_000 && age <= maxAge;
 }
 export function unavailableSource(id: string, token: string, limitation: string, now = Date.now()): ResearchSource {
   return { id, label: { market: "Token identity & market", index: "Indexed curve history", curve: "Recent curve check", holders: "Holder snapshot" }[id] ?? id,
-    url: `${explorer}/address/${token}`, fetchedAt: new Date(now).toISOString(), evidenceAt: null,
+    url: robinhoodExplorer.address(token), fetchedAt: new Date(now).toISOString(), evidenceAt: null,
     freshness: "unavailable", facts: [], limitations: [limitation], metrics: {} };
 }
 export function marketSource(token: string, item: TokenSearchResult | null, now = Date.now()): ResearchSource {
@@ -20,7 +20,7 @@ export function marketSource(token: string, item: TokenSearchResult | null, now 
   if (item.volume24hUsd != null) facts.push(`PONS-reported trailing 24h volume: $${item.volume24hUsd.toLocaleString("en-US")}.`);
   if (item.latestBuyAt) facts.push(`Latest buy reported by PONS: ${item.latestBuyAt}. This is not the latest trade timestamp.`);
   if (item.graduated !== undefined) facts.push(`PONS graduation flag: ${item.graduated ? "graduated" : "not graduated"}.`);
-  return { id: "market", label: "Token identity & market", url: item.source === "pons" ? `https://www.ponsfamily.com/launchpad/${token}` : `${explorer}/address/${token}`,
+  return { id: "market", label: "Token identity & market", url: item.source === "pons" ? `https://www.ponsfamily.com/launchpad/${token}` : robinhoodExplorer.address(token),
     fetchedAt: new Date(now).toISOString(), evidenceAt: item.sourceFetchedAt ?? null,
     freshness: !item.sourceStale && recentTimestamp(item.sourceFetchedAt, now) ? "recent" : "historical", facts,
     limitations: ["Identity is not an endorsement. Market figures are source-reported snapshots, not a reconstructed trade ledger.", ...(item.sourceFetchedAt ? [] : ["The source observation time is unavailable; current market conditions cannot be established."])],
@@ -29,7 +29,7 @@ export function marketSource(token: string, item: TokenSearchResult | null, now 
 export function indexedSource(token: string, dossier: ResearchDossier | null, now = Date.now()): ResearchSource {
   if (!dossier) return unavailableSource("index", token, "This token has no supported PONS V2 dossier in the current index. Broader market or other-chain coverage is not implied.", now);
   const coverage = dossier.coverage, window = dossier.windows[0];
-  return { id: "index", label: "Indexed curve history", url: `${explorer}/address/${dossier.token.curveAddress}`,
+  return { id: "index", label: "Indexed curve history", url: robinhoodExplorer.address(dossier.token.curveAddress),
     fetchedAt: new Date(now).toISOString(), evidenceAt: window?.lastTradeAt ?? null,
     freshness: coverage.current && recentTimestamp(coverage.lastCollectedAt, now) ? "recent" : "historical",
     facts: [
@@ -41,7 +41,7 @@ export function indexedSource(token: string, dossier: ResearchDossier | null, no
 export function curveSource(token: string, check: RecentCurveCheck | null, graduated: boolean, now = Date.now()): ResearchSource {
   if (graduated) return unavailableSource("curve", token, "This token is marked graduated. A bonding-curve sample would omit subsequent pool trading and is not used to assess current activity.", now);
   if (!check || check.tokenAddress !== token) return unavailableSource("curve", token, "A recent verified curve sample could not be collected. No zero-activity claim is made.", now);
-  return { id: "curve", label: "Recent curve check", url: `${explorer}/address/${check.curveAddress}`,
+  return { id: "curve", label: "Recent curve check", url: robinhoodExplorer.address(check.curveAddress),
     fetchedAt: new Date(now).toISOString(), evidenceAt: check.throughTime,
     freshness: recentCurveIsFresh(check, now) && recentTimestamp(check.throughTime, now, 300_000) ? "recent" : "historical",
     facts: [`Curve blocks ${check.fromBlock}–${check.throughBlock}, from ${check.fromTime} through ${check.throughTime}: ${check.trades} trades, ${check.buys} buys, ${check.sells} sells, ${check.actors} wallet addresses.`],
@@ -51,7 +51,7 @@ export function curveSource(token: string, check: RecentCurveCheck | null, gradu
 export function holderSource(token: string, dossier: ResearchDossier | null, now = Date.now()): ResearchSource {
   const evidence = dossier?.holderEvidence;
   if (!evidence?.observedAt) return unavailableSource("holders", token, "No dated holder distribution was returned. Trade wallet counts cannot substitute for token holders.", now);
-  return { id: "holders", label: "Holder snapshot", url: `${explorer}/token/${token}?tab=holders`, fetchedAt: new Date(now).toISOString(), evidenceAt: evidence.observedAt,
+  return { id: "holders", label: "Holder snapshot", url: `${robinhoodExplorer.token(token)}#balances`, fetchedAt: new Date(now).toISOString(), evidenceAt: evidence.observedAt,
     freshness: recentTimestamp(evidence.observedAt, now, 300_000) ? "recent" : "historical",
     facts: [`Reported holder count: ${evidence.holderCount ?? "unavailable"}. Sample: ${evidence.holderSampleSize} addresses.`, `Largest sampled wallet share: ${evidence.largestWalletSharePercent == null ? "unavailable" : `${evidence.largestWalletSharePercent}%`}. Reserve share: ${evidence.reserveSharePercent == null ? "unavailable" : `${evidence.reserveSharePercent}%`}.`],
     limitations: [evidence.holdersComplete ? "Complete distribution returned for the recorded snapshot, not continuous holder tracking." : "Partial holder sample; concentration and distribution claims are limited to returned records.", "A wallet may be a pool, contract or one of several addresses controlled by the same person. Holder retention is not established."],

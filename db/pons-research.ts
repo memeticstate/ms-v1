@@ -1,5 +1,5 @@
 import { getD1 } from "@/db";
-import type { PonsLaunchView, PonsStateResponse, PonsTokenEvidence } from "@/lib/pons/model";
+import type { PonsActivitySignal, PonsLaunchView, PonsStateResponse, PonsTokenEvidence } from "@/lib/pons/model";
 import { PONS_PAIR_BY_SYMBOL } from "@/lib/pons/constants";
 import { PONS_SIGNAL_WINDOW_BLOCKS, ponsMomentumPercent } from "@/lib/pons/signals";
 import { applyResearchPolicy } from "@/lib/pons/research";
@@ -660,6 +660,7 @@ export async function loadPonsTokenTransitions(addresses: string[]) {
           ) AS state_rank
         FROM pons_token_state_history
         WHERE token_address IN (${batch.map(() => "?").join(",")})
+          AND change_kind <> 'heartbeat'
       )
       WHERE state_rank <= 2
       ORDER BY token_address, state_rank
@@ -687,6 +688,77 @@ export async function loadPonsTokenTransitions(addresses: string[]) {
   }
 
   return transitions;
+}
+
+export const PONS_TOKEN_HISTORY_LIMIT = 40;
+export const PONS_STATE_CHANGES_LIMIT = 60;
+
+export async function loadPonsTokenStateHistory(tokenAddress: string) {
+  const rows = await getD1().prepare(`
+    SELECT observed_at, signal, phase, change_kind, payload_json
+    FROM pons_token_state_history
+    WHERE token_address = ? AND change_kind <> 'heartbeat'
+    ORDER BY observed_at DESC, id DESC LIMIT ?
+  `).bind(tokenAddress.toLowerCase(), PONS_TOKEN_HISTORY_LIMIT + 1).all<{
+    observed_at: number;
+    signal: PonsActivitySignal;
+    phase: PonsLaunchView["phase"];
+    change_kind: string;
+    payload_json: string;
+  }>();
+  return {
+    tokenAddress: tokenAddress.toLowerCase(),
+    records: rows.results.slice(0, PONS_TOKEN_HISTORY_LIMIT).map((row) => ({
+      observedAt: new Date(row.observed_at).toISOString(),
+      signal: row.signal,
+      label: payloadString(payloadObject(row.payload_json), "researchLabel") ?? row.signal,
+      phase: row.phase,
+      changeKinds: row.change_kind.split(",").filter(Boolean),
+    })),
+    partial: rows.results.length > PONS_TOKEN_HISTORY_LIMIT,
+  };
+}
+
+/** Persisted changes are a dated record, independent of current eligibility. */
+export async function loadRecentPonsStateChanges(tokens?: string[], now = Date.now()) {
+  const requested = tokens ? [...new Set(tokens.map((token) => token.toLowerCase()))].slice(0, 50) : null;
+  if (requested && !requested.length) return { changes: [], limit: PONS_STATE_CHANGES_LIMIT, partial: false };
+  const rows = await getD1().prepare(`
+    SELECT h.token_address, MAX(h.observed_at) AS latest_change_at,
+      l.token_name, l.token_symbol, l.pair_symbol
+    FROM pons_token_state_history h
+    JOIN pons_launches l ON l.token_address = h.token_address
+    WHERE h.change_kind NOT IN ('initial', 'heartbeat')
+      ${requested ? `AND h.token_address IN (${requested.map(() => "?").join(",")})` : "AND h.observed_at BETWEEN ? AND ?"}
+    GROUP BY h.token_address
+    ORDER BY latest_change_at DESC, h.token_address ASC LIMIT ?
+  `).bind(
+    ...(requested ?? [now - 24 * 60 * 60_000, now + 30_000]),
+    PONS_STATE_CHANGES_LIMIT + 1,
+  ).all<{
+    token_address: string;
+    latest_change_at: number;
+    token_name: string | null;
+    token_symbol: string | null;
+    pair_symbol: string;
+  }>();
+  const selected = rows.results.slice(0, PONS_STATE_CHANGES_LIMIT);
+  const transitions = await loadPonsTokenTransitions(selected.map((row) => row.token_address));
+  return {
+    changes: selected.flatMap((row) => {
+      const transition = transitions.get(row.token_address);
+      if (!transition) return [];
+      return [{
+        tokenAddress: row.token_address,
+        name: row.token_name || "Name unresolved",
+        symbol: row.token_symbol || "—",
+        pairSymbol: row.pair_symbol,
+        transition,
+      }];
+    }),
+    limit: PONS_STATE_CHANGES_LIMIT,
+    partial: rows.results.length > PONS_STATE_CHANGES_LIMIT,
+  };
 }
 
 export async function decorateResearch(state: PonsStateResponse, requestedToken?: string, browse?: { pair?: string; phase?: string }) {

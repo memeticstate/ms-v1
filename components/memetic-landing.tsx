@@ -1,5 +1,7 @@
 "use client";
 
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, ArrowRight, RefreshCw } from "lucide-react";
 import { StateGlyph } from "@/components/state-glyph";
@@ -34,7 +36,7 @@ function EvidencePreview({ item }: { item: RadarReading }) {
     </dl>
     <Button asChild className={styles.evidenceButton}><a href={tokenAppHref(item.token.tokenAddress)}>{item.kind === "research" ? "Inspect full evidence" : "Open token details"} <ArrowUpRight aria-hidden="true" /></a></Button>
     <p className={styles.readingTime}>{item.evidenceLabel}: {dateLabel(item.evidenceAt)}</p>
-    <a className={styles.contractLink} href={`https://robinhoodchain.blockscout.com/address/${item.token.tokenAddress}`} target="_blank" rel="noreferrer">{shortTokenAddress(item.token.tokenAddress)} <ArrowUpRight aria-hidden="true" /></a>
+    <a className={styles.contractLink} href={robinhoodExplorer.address(item.token.tokenAddress)} target="_blank" rel="noreferrer">{shortTokenAddress(item.token.tokenAddress)} <ArrowUpRight aria-hidden="true" /></a>
   </aside>;
 }
 
@@ -182,7 +184,7 @@ export function MemeticLanding() {
             <button type="button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh landing-page evidence"><RefreshCw aria-hidden="true" className={loading ? styles.refreshing : undefined} /></button>
           </div>
         </div>
-        {state && !fresh ? <p className={styles.coverageNote}>Market discovery is available while our deeper trade history catches up. <a href="/app?view=evidence">Research coverage <ArrowUpRight aria-hidden="true" /></a></p> : null}
+        {state && !fresh ? <p className={styles.coverageNote}>Market discovery is available while our deeper trade history catches up. <a href="/app/observe?view=evidence">Research coverage <ArrowUpRight aria-hidden="true" /></a></p> : null}
         {error || discovery?.partial ? <p role="status" className={styles.coverageNote}>Some market data couldn’t refresh. Only readings with sufficiently recent observations appear below.</p> : null}
 
         <div className={styles.searchRow} role="search" aria-label="Search Robinhood Chain tokens">
@@ -196,7 +198,7 @@ export function MemeticLanding() {
               <TabsTrigger value="changes" className={styles.tab}>Recent activity</TabsTrigger>
               <TabsTrigger value="launches" className={styles.tab}>New launches</TabsTrigger>
             </TabsList>
-            <a className={styles.explorerLink} href="/app">Open full explorer <ArrowUpRight aria-hidden="true" /></a>
+            <a className={styles.explorerLink} href="/app/observe">Open full explorer <ArrowUpRight aria-hidden="true" /></a>
           </div>
           {(["changes", "launches"] as const).map((value) => <TabsContent key={value} value={value} className={styles.tabContent}>
             <p className={styles.previewNote}>{tab === "launches" ? "Newly listed on PONS. A launch alone doesn’t establish momentum." : "Current research readings first, then larger graduated markets with a buy reported in the past hour."}</p>
@@ -219,14 +221,14 @@ export function MemeticLanding() {
               <p>{loading ? "Loading token identities and their latest available observations." : "Search any token above, try New launches, or explore the dated records in the full app."}</p>
               <div className={styles.emptyActions}>
                 <Button className={styles.evidenceButton} onClick={() => void refresh()} disabled={loading}>Try again <RefreshCw aria-hidden="true" /></Button>
-                <a href="/app?view=evidence" className={styles.textLink}>Open the evidence workspace <ArrowUpRight aria-hidden="true" /></a>
+                <a href="/app/observe?view=evidence" className={styles.textLink}>Open the evidence workspace <ArrowUpRight aria-hidden="true" /></a>
               </div>
             </div>}
           </TabsContent>)}
         </Tabs>
         <div className={styles.radarFootnote}>
           <p>PONS market activity and Memetic research have separate evidence checks. Neither is a buy recommendation.</p>
-          <a href="/app?view=watchlist">Your watchlist <ArrowUpRight aria-hidden="true" /></a>
+          <a href="/app/saved">Your watchlist <ArrowUpRight aria-hidden="true" /></a>
         </div>
       </div>
     </section>

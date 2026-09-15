@@ -74,9 +74,9 @@ test("preview stays bounded, searches actual records and never invents matches",
 });
 
 test("deep links are local, encoded, and keep the exact requested token", () => {
-  assert.equal(tokenAppHref(launch.tokenAddress), `/app?view=signals&token=${launch.tokenAddress}&inspect=1`);
+  assert.equal(tokenAppHref(launch.tokenAddress), `/app/token/${launch.tokenAddress}`);
   assert.equal(tokenAppHref("https://example.com"), "/app");
-  assert.equal(legacyAppHref({ view: "atlas", token: launch.tokenAddress, pair: "NVDA", window: "100000" }), `/app?view=atlas&token=${launch.tokenAddress}&pair=NVDA&window=100000`);
+  assert.equal(legacyAppHref({ view: "atlas", token: launch.tokenAddress, pair: "NVDA", window: "100000" }), `/app/observe?view=atlas&token=${launch.tokenAddress}&pair=NVDA&window=100000`);
   assert.equal(legacyAppHref({ utm_source: "twitter" }), null);
   assert.equal(legacyAppHref({}), null);
 });

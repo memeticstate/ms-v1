@@ -28,7 +28,7 @@ const { marketSource, curveSource, recentTimestamp } = await vite.ssrLoadModule(
 const store = new ResearchStore(db), token = "0x" + "a".repeat(40);
 const input = { tokenAddress: token, question: "Is participation broadening?", focus: "participation", cadence: "manual" };
 const now = Date.parse("2026-09-10T12:00:00Z");
-const source = { id: "index", label: "Indexed history", url: `https://robinhoodchain.blockscout.com/address/${token}`, fetchedAt: new Date(now).toISOString(), evidenceAt: new Date(now - 86400000).toISOString(), freshness: "historical", facts: ["5 trades in an older indexed window."], limitations: ["Historical only."], metrics: { throughBlock: 100, windowBlocks: 25, trades: 5, actors: 3 } };
+const source = { id: "index", label: "Indexed history", url: `https://robin.etherscan.io/address/${token}`, fetchedAt: new Date(now).toISOString(), evidenceAt: new Date(now - 86400000).toISOString(), freshness: "historical", facts: ["5 trades in an older indexed window."], limitations: ["Historical only."], metrics: { throughBlock: 100, windowBlocks: 25, trades: 5, actors: 3 } };
 const report = { version: "researcher-v1", tokenAddress: token, name: "Example", symbol: "EX", question: input.question, generatedAt: new Date(now).toISOString(), mode: "evidence", analysis: null, analysisStatus: "not_configured", sources: [source], changes: ["First observation."], steps: [] };
 const gate = async () => ({ access: { active: true, expiresAt: new Date(Date.now() + 120000).toISOString() }, adapter: {} });
 const http = (request, userId = "holder", evaluate = gate) => researcherResponse(request, { store, configured: false, authenticate: async () => userId ? { id: userId } : null, evaluate });

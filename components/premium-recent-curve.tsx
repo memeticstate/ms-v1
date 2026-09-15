@@ -1,10 +1,11 @@
 "use client";
 
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
+
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMemeticAuth } from "@/components/memetic-auth-provider";
-import { EXPLORER } from "@/lib/premium/research";
 import { recentCurveIsFresh, type RecentCurveResult } from "@/lib/premium/recent-curve";
 
 const date = (value: string) => new Date(value).toLocaleString(undefined, { timeZoneName: "short" });
@@ -48,8 +49,8 @@ export function PremiumRecentCurve({ token }: { token: string }) {
     {check ? <div className="mt-5 space-y-4">
       <p className={`text-sm ${fresh ? "text-signal" : "text-attention"}`}>{fresh ? "Recent observation" : "Dated observation · refresh before use"} · chain observed {date(check.headObservedAt)}</p>
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Curve trades", check.trades], ["Buys", check.buys], ["Sells", check.sells], ["Distinct actors", check.actors]].map(([title, value]) => <div key={title}><dt className="text-sm text-muted-foreground">{title}</dt><dd className="mt-1 font-mono text-2xl">{Number(value).toLocaleString()}</dd></div>)}</dl>
-      <p className="text-sm leading-6 text-muted-foreground">Window: #{check.fromBlock.toLocaleString()}–#{check.throughBlock.toLocaleString()} · {date(check.fromTime)}–{date(check.throughTime)}. Source: {check.provider}, one RPC provider. <a href={`${EXPLORER}/address/${check.curveAddress}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">Inspect curve <ExternalLink className="size-3" /></a></p>
-      {check.trades === 0 ? <p className="text-sm leading-6 text-muted-foreground">No curve trades were returned for this exact window. Trading may have moved to a pool after graduation.</p> : <details><summary className="cursor-pointer text-sm underline underline-offset-4">Inspect {check.recentTrades.length} most recent transactions</summary><ul className="mt-3 grid gap-2 sm:grid-cols-2">{check.recentTrades.map(trade => <li key={trade.id} className="text-sm"><a href={`${EXPLORER}/tx/${trade.transaction}`} target="_blank" rel="noreferrer" className="underline underline-offset-4">{trade.side} · #{trade.blockNumber.toLocaleString()} · {short(trade.actor)}</a></li>)}</ul></details>}
+      <p className="text-sm leading-6 text-muted-foreground">Window: #{check.fromBlock.toLocaleString()}–#{check.throughBlock.toLocaleString()} · {date(check.fromTime)}–{date(check.throughTime)}. Source: {check.provider}, one RPC provider. <a href={robinhoodExplorer.address(check.curveAddress)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">Inspect curve <ExternalLink className="size-3" /></a></p>
+      {check.trades === 0 ? <p className="text-sm leading-6 text-muted-foreground">No curve trades were returned for this exact window. Trading may have moved to a pool after graduation.</p> : <details><summary className="cursor-pointer text-sm underline underline-offset-4">Inspect {check.recentTrades.length} most recent transactions</summary><ul className="mt-3 grid gap-2 sm:grid-cols-2">{check.recentTrades.map(trade => <li key={trade.id} className="text-sm"><a href={robinhoodExplorer.tx(trade.transaction)} target="_blank" rel="noreferrer" className="underline underline-offset-4">{trade.side} · #{trade.blockNumber.toLocaleString()} · {short(trade.actor)}</a></li>)}</ul></details>}
     </div> : <p className="mt-4 text-sm leading-6 text-muted-foreground">Select Check recent curve to collect an observation for {short(token)}.</p>}
     <p className="mt-5 border-t border-foreground/10 pt-4 text-sm leading-6 text-muted-foreground">Curve activity only. Swaps after graduation, holders and other venues are outside this check. This observation stays separate from historical comparisons and saved case snapshots. An incomplete or failed response is shown as unavailable.</p>
   </section>;

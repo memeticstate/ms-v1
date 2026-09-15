@@ -1,3 +1,4 @@
+import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 import type { ResearchDossier, ResearchWindow } from "./research";
 
 export const RESEARCH_WINDOW_OPTIONS = [5_000, 25_000, 100_000] as const;
@@ -18,7 +19,7 @@ export function researchWorkflow(data: Pick<ResearchDossier, "token" | "windows"
   const [latest, previous] = data.windows;
   const comparison = compareResearchWindows(data.windows);
   const holder = data.holderEvidence;
-  const explorer = `https://robinhoodchain.blockscout.com/token/${data.token.address}`;
+  const explorer = robinhoodExplorer.token(data.token.address);
   const invalidationPaths: InvalidationPath[] = [
     { id: "freshness", title: "Can this describe participation now?", status: data.coverage.current ? "not-flagged" : "unresolved",
       basis: `${data.coverage.lagBlocks.toLocaleString()} blocks behind the observed head. Collection gaps remain possible.`,
@@ -35,7 +36,7 @@ export function researchWorkflow(data: Pick<ResearchDossier, "token" | "windows"
   ];
   const prompts: ResearchPrompt[] = [
     { id: "breadth", question: "Is activity spreading across wallets or being repeated by the same actors?", basis: latest ? `${latest.actors} wallet addresses across ${latest.trades} ${latest.sampled ? "sampled" : "indexed"} trades in the selected window.` : "No selected-window sample is available.", next: "Compare wallet breadth, then inspect individual transactions and the holder sample.", url: explorer },
-    { id: "habitat", question: `Is the ${data.token.quoteSymbol} connection specific to this launch?`, basis: `The launch records quote asset ${data.token.quoteAddress}.`, next: "Compare PONS launches using that exact quote contract. The separately dated PAIR API sample offers habitat context only; shared labels do not establish shared liquidity.", url: `https://robinhoodchain.blockscout.com/address/${data.token.quoteAddress}` },
+    { id: "habitat", question: `Is the ${data.token.quoteSymbol} connection specific to this launch?`, basis: `The launch records quote asset ${data.token.quoteAddress}.`, next: "Compare PONS launches using that exact quote contract. The separately dated PAIR API sample offers habitat context only; shared labels do not establish shared liquidity.", url: robinhoodExplorer.address(data.token.quoteAddress) },
     { id: "falsify", question: "What observable change would make you abandon this interpretation?", basis: "Record your own invalidation condition before reviewing another window.", next: "Save a case with the evidence anchor, then compare a later observation and record the outcome.", url: explorer },
   ];
   return { prompts, invalidationPaths };

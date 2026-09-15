@@ -1,5 +1,5 @@
-import { PonsObservatory } from "@/components/pons-observatory";
+import { SimpleExperience } from "@/components/simple-experience";
 
 export default function AppPage() {
-  return <PonsObservatory />;
+  return <SimpleExperience />;
 }
