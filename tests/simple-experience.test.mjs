@@ -97,3 +97,35 @@ test('a recorded change renders its dated state without inventing current counts
   assert.match(html, /Open brief for current evidence/);
   assert.doesNotMatch(html, /Participation verified|>0<|vs prior/);
 });
+
+test('an earlier verified transition is historical when current holder evidence removes verification', async () => {
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { TokenStateTransition } = await vite.ssrLoadModule('/components/pons-observatory.tsx');
+  const { BriefStateChange } = await vite.ssrLoadModule('/components/token-brief.tsx');
+  const currentGuidance = 'Keep this out of the current shortlist. Inspect retained participation.';
+  const oldGuidance = 'Compare participation with neighboring tokens in this habitat.';
+  const launch = {
+    signal: 'unverified', recentTrades: 687, recentUniqueTraders: 128,
+    currentEvidence: { status: 'partial', meaningfulHolders: 0, holderSampleSize: 46 },
+    research: { signal: 'unverified', eligible: false, next: currentGuidance },
+    stateTransition: { observedAt: new Date(now - 6 * 60_000).toISOString(), from: 'unverified', to: 'steady',
+      kind: 'strengthened', label: 'Current participation became verified',
+      whatChanged: ['Current eligibility requirements are now satisfied.'], watchNext: oldGuidance },
+  };
+  const before = JSON.stringify(launch);
+  const legacy = renderToStaticMarkup(createElement(TokenStateTransition, { launch }));
+  const brief = renderToStaticMarkup(createElement(BriefStateChange, { launch, now }));
+  for (const html of [legacy, brief]) {
+    assert.match(html, /Recorded state change/);
+    assert.match(html, /The recorded transition ended at <strong>STEADY<\/strong>/);
+    assert.match(html, /The current reading is <strong>UNVERIFIED<\/strong>/);
+  }
+  assert.match(legacy, /What changed at that observation/);
+  assert.match(legacy, /Current eligibility requirements are now satisfied\./);
+  assert.match(legacy, /Watch next · current reading/);
+  assert.ok(legacy.includes(currentGuidance));
+  assert.ok(!legacy.includes(oldGuidance));
+  assert.match(brief, /Recorded 6m ago/);
+  assert.equal(JSON.stringify(launch), before, 'presentation must not rewrite current or historical evidence');
+});
