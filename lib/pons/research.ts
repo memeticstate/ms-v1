@@ -73,6 +73,11 @@ export function assessLaunch(launch: PonsLaunchView, fresh: boolean, now = Date.
     "Trade counts alone do not show retained ownership. A current holder sample is unavailable or older than ten minutes.",
   ], "Verify holders before treating this as relevant. Pools, lockers and other contracts are excluded from wallet breadth; addresses are not people.");
 
+  if (evidence.holderSampleSize < MIN_MEANINGFUL_HOLDERS) return result("unverified", "Holder sample incomplete", [
+    `Only ${evidence.holderSampleSize} readable non-contract wallets were returned in the current ownership sample.`,
+    `Discovery requires enough holder coverage to test whether at least ${MIN_MEANINGFUL_HOLDERS} wallets retain a meaningful balance. Missing wallets are not treated as zero balances.`,
+  ], "Keep this out of the current shortlist until a broader fresh ownership sample is available.");
+
   if (launch.recentTrades < MIN_PULSE_TRADES || launch.recentUniqueTraders < MIN_PULSE_ACTORS
     || launch.previousTrades < 6 || (launch.previousUniqueTraders ?? 0) < 3
     || evidence.meaningfulHolders < MIN_MEANINGFUL_HOLDERS || (evidence.largestWalletSharePercent ?? 100) > 20) return result("unverified", "Insufficient sustained participation", [

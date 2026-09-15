@@ -356,3 +356,21 @@ test("holder research rotates fairly and deepens samples through bounded RPC chu
   assert.match(researchIngestion, /holder_sample_budget_exhausted/);
   assert.match(rpc, /readPonsContracts\(requests: RpcRequest\[\], deadline = Infinity\)/);
 });
+
+
+test("small holder samples remain unverified without claiming holder depletion", () => {
+  const reading = assessLaunch({
+    ...viable,
+    currentEvidence: {
+      ...viable.currentEvidence,
+      holderSampleSize: 6,
+      meaningfulHolders: 4,
+      largestWalletSharePercent: 2,
+    },
+  }, true, now);
+
+  assert.equal(reading.eligible, false);
+  assert.equal(reading.signal, "unverified");
+  assert.equal(reading.label, "Holder sample incomplete");
+  assert.match(reading.reasons.join(" "), /6 readable non-contract wallets/);
+});
