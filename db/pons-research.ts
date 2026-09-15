@@ -97,10 +97,29 @@ export async function researchCandidate(token?: string) {
     .first<{ token_address: string; curve_address: string; deployer_address: string }>();
 }
 export async function recentTokenActors(token: string) {
-  // Bound the scan before grouping. Never scan every trade to resolve a name.
-  const rows = await getD1().prepare(`SELECT actor_address FROM (
-    SELECT actor_address FROM pons_curve_trades WHERE token_address = ? ORDER BY block_number DESC LIMIT 300
-    ) GROUP BY actor_address LIMIT 48`).bind(token).all<{ actor_address: string }>();
+  // Sample ownership candidates from the same two pulse windows used by the
+  // participation engine. A fixed "last N trades" slice can collapse to a few
+  // hyperactive wallets and understate holder breadth on busy tokens.
+  const rows = await getD1().prepare(`
+    WITH tip AS (
+      SELECT latest_safe_block AS block
+      FROM pons_index_state
+      WHERE id = 'pons-v2'
+    )
+    SELECT t.actor_address
+    FROM pons_curve_trades t
+    CROSS JOIN tip
+    WHERE t.token_address = ?
+      AND t.block_number BETWEEN tip.block - ? + 1 AND tip.block
+    GROUP BY t.actor_address
+    ORDER BY
+      MAX(CASE WHEN t.block_number > tip.block - ? THEN 1 ELSE 0 END) DESC,
+      MAX(t.block_number) DESC
+    LIMIT 48
+  `)
+    .bind(token, PONS_SIGNAL_WINDOW_BLOCKS * 2, PONS_SIGNAL_WINDOW_BLOCKS)
+    .all<{ actor_address: string }>();
+
   return rows.results.map((r) => r.actor_address);
 }
 async function archivedLaunches(addresses: string[], state: PonsStateResponse): Promise<PonsLaunchView[]> {

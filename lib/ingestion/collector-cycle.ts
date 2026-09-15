@@ -45,9 +45,25 @@ async function withScheduledResearch(
   results: Array<Awaited<ReturnType<typeof capture>>>,
 ) {
   // Holder evidence follows the minute's primary RPC lane instead of competing
-  // with it. One attention-ranked token per minute is enough to keep the
-  // current shortlist under continuous review without scanning every launch.
-  results.push(await capture("pons-research", () => runTokenResearch()));
+  // with it. Two sequential attention-ranked reads give the sustained cohort
+  // enough throughput to remain inside the ten-minute evidence window.
+  for (let slot = 0; slot < 2; slot++) {
+    const research = await capture(
+      `pons-research-${slot + 1}`,
+      () => runTokenResearch(undefined, { intervalMs: 0 }),
+    );
+    results.push(research);
+
+    // Stop early when no eligible stale candidate remains.
+    if (
+      research.status === "fulfilled"
+      && research.value.status === "skipped"
+      && research.value.reason === "already_fresh_or_not_indexed"
+    ) {
+      break;
+    }
+  }
+
   return results;
 }
 

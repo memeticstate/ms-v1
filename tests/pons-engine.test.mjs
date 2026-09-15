@@ -346,7 +346,8 @@ test("holder research rotates fairly and deepens samples through bounded RPC chu
     readFile(new URL("../lib/ingestion/pons-rpc.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(researchDb, /GROUP BY actor_address LIMIT 48/);
+  assert.match(researchDb, /GROUP BY t\.actor_address/);
+  assert.match(researchDb, /LIMIT 48/);
   assert.ok(
     researchDb.indexOf("COALESCE(r.checked_at, 0) ASC") <
     researchDb.indexOf("COALESCE(a.recent_trades, 0) DESC")
@@ -373,4 +374,25 @@ test("small holder samples remain unverified without claiming holder depletion",
   assert.equal(reading.signal, "unverified");
   assert.equal(reading.label, "Holder sample incomplete");
   assert.match(reading.reasons.join(" "), /6 readable non-contract wallets/);
+});
+
+
+test("holder research samples signal windows and schedules two sequential refreshes", async () => {
+  const [researchDb, researchIngestion, cycle] = await Promise.all([
+    readFile(new URL("../db/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/pons-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/ingestion/collector-cycle.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(researchDb, /PONS_SIGNAL_WINDOW_BLOCKS \* 2/);
+  assert.match(researchDb, /GROUP BY t\.actor_address/);
+  assert.match(researchDb, /LIMIT 48/);
+  assert.doesNotMatch(researchDb, /ORDER BY block_number DESC LIMIT 300/);
+
+  assert.match(researchIngestion, /options: \{ intervalMs\?: number \}/);
+  assert.match(researchIngestion, /options\.intervalMs \?\? 5_000/);
+
+  assert.match(cycle, /slot < 2/);
+  assert.match(cycle, /intervalMs: 0/);
+  assert.match(cycle, /pons-research-\$\{slot \+ 1\}/);
 });

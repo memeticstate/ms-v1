@@ -58,9 +58,14 @@ async function socialEvidence(token: string, twitterUrl: string | null): Promise
   } catch { return { status: "unavailable", mentions: null, authors: null, latestPostAt: null, posts: [] }; }
 }
 
-export async function runTokenResearch(token?: string) {
+export async function runTokenResearch(
+  token?: string,
+  options: { intervalMs?: number } = {},
+) {
   if (token && !ADDRESS.test(token)) return { status: "rejected", reason: "invalid_address" };
-  if (!await acquireAuxJob("token-research", 5_000)) return { status: "skipped", reason: "research_cooldown" };
+  if (!await acquireAuxJob("token-research", options.intervalMs ?? 5_000)) {
+    return { status: "skipped", reason: "research_cooldown" };
+  }
   try {
     const candidate = await researchCandidate(token?.toLowerCase());
     if (!candidate) return { status: "skipped", reason: "already_fresh_or_not_indexed" };
