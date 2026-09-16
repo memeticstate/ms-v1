@@ -7,7 +7,7 @@ import { evaluatePremiumAccess } from "@/lib/entitlements/token-gate";
 import { researchModelConfig } from "./agent";
 import { investigate } from "./engine";
 import { boundedRead } from "./sources";
-import type { ResearchReport, ResearchTask } from "./model";
+import { failureCode, type ResearchReport, type ResearchTask } from "./model";
 
 export async function runNextResearch(store: ResearchStore, services: {
   eligible: (userId: string) => Promise<boolean>;
@@ -22,28 +22,11 @@ export async function runNextResearch(store: ResearchStore, services: {
       await store.finish(job, "blocked", null, "holder_access_required"); return;
     }
     const report = await services.investigate(task, await store.previous(job.userId, job.assignmentId));
-    await store.finish(job, report.analysisStatus === "complete" && report.sources.every(s => s.freshness !== "unavailable") ? "complete" : "partial", report, null);
+    const failure = report.steps.find(step => step.status === "unavailable" && step.code)?.code;
+    await store.finish(job, report.analysisStatus === "complete" && report.sources.every(s => s.freshness !== "unavailable") ? "complete" : "partial", report, failure ? failureCode(new Error(failure)) : null);
   } catch (error) {
-    const name = error instanceof Error ? error.name : "UnknownError";
-    const message = error instanceof Error ? error.message : "unknown_error";
-
-    // Preserve short machine-readable internal errors without exposing
-    // arbitrary upstream response bodies or secrets.
-    const simple = /^[a-zA-Z0-9_:-]{1,80}$/.test(message)
-      ? message
-      : "";
-
-    const code = simple || `internal_${name
-      .replace(/[^a-zA-Z0-9]/g, "_")
-      .toLowerCase()
-      .slice(0, 60)}`;
-
-    console.error("research run failed", {
-      code,
-      name,
-      detail: simple ? undefined : message.slice(0, 300),
-    });
-
+    const code = failureCode(error);
+    console.error("research run failed", { code });
     await store.finish(job, "failed", null, code);
   }
 }

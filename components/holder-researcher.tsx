@@ -61,7 +61,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
       <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">{source.limitations.map((limit, i) => <li key={i}>{limit}</li>)}</ul>
       <a href={canonicalRobinhoodExplorerUrl(source.url)} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1 text-sm text-signal underline underline-offset-4">Open source <ArrowUpRight className="size-4" /></a>
     </details>)}</div></section>
-    <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Investigation steps</summary><ol className="mt-3 list-decimal space-y-2 pl-5">{report.steps.map((step, i) => <li key={i}>{step.tool}: {step.note}</li>)}</ol></details>
+    <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Investigation steps</summary><ol className="mt-3 list-decimal space-y-2 pl-5">{report.steps.map((step, i) => <li key={i}>{step.tool}: {step.note}{step.code && <code className="ml-2 break-all text-xs" aria-label={`Diagnostic code: ${step.code}`}>{step.code}</code>}</li>)}</ol></details>
   </div>;
 }
 

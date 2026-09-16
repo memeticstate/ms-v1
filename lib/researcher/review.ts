@@ -1,15 +1,16 @@
 import { z } from "zod";
-import { requestResearchModel } from "./agent";
+import { requestResearchModel, type ResearchModelConfig } from "./agent";
+import { assertCitations, capped, validatedSubmission, type RepairBudget } from "./submission";
 import type { ResearchAnalysis, ResearchReport, ResearchSource, ResearchTask, ResearchThesis } from "./model";
 
 const sentence = z.string().trim().min(1).max(700);
 const finding = z.object({ claim: sentence, sourceIds: z.array(z.string().max(20)).min(1).max(4) }).strict();
 const schema = z.object({
   statement: sentence, verdict: z.enum(["supported", "challenged", "unresolved"]), conclusion: sentence,
-  support: z.array(finding).max(3), challenges: z.array(finding).max(3), unknowns: z.array(sentence).min(1).max(4),
-  invalidationConditions: z.array(sentence).min(1).max(3), nextChecks: z.array(sentence).min(1).max(3),
+  support: capped(finding, 3), challenges: capped(finding, 3), unknowns: capped(sentence, 4, 1),
+  invalidationConditions: capped(sentence, 3, 1), nextChecks: capped(sentence, 3, 1),
   change: z.enum(["baseline", "strengthened", "weakened", "unchanged", "unresolved"]), changeReason: sentence,
-  reviewNotes: z.array(z.object({ issue: sentence, resolution: sentence }).strict()).min(1).max(3),
+  reviewNotes: capped(z.object({ issue: sentence, resolution: sentence }).strict(), 3, 1),
 }).strict();
 const string = { type: "string" }, strings = { type: "array", items: string };
 const findings = { type: "array", items: { type: "object", properties: { claim: string, sourceIds: strings }, required: ["claim", "sourceIds"], additionalProperties: false } };
@@ -43,8 +44,8 @@ export function hasNewReviewEvidence(previous: ResearchThesis, sources: Research
 }
 
 export async function reviewResearch(options: {
-  config: { key: string; model: string }; task: ResearchTask; draft: ResearchAnalysis;
-  sources: ResearchSource[]; previous: ResearchThesis | null; deadline: number; fetcher?: typeof fetch;
+  config: ResearchModelConfig; task: ResearchTask; draft: ResearchAnalysis;
+  sources: ResearchSource[]; previous: ResearchThesis | null; deadline: number; fetcher?: typeof fetch; repairBudget?: RepairBudget;
 }): Promise<{ analysis: ResearchAnalysis; thesis: ResearchThesis }> {
   const citableSources = options.sources.filter(
     source => source.freshness !== "unavailable"
@@ -54,52 +55,35 @@ export async function reviewResearch(options: {
     .filter(source => source.freshness === "unavailable")
     .map(source => source.id);
 
-  const output = await requestResearchModel({
-    ...options,
-    instructions,
-    tools: [finish],
-    toolChoice: { type: "function", name: "finish_review" },
-    input: [{
-      role: "user",
-      content: JSON.stringify({
-        token: options.task.tokenAddress,
-        question: options.task.question,
-        draft: options.draft,
-        observations: citableSources,
-        unavailableSourceIds,
-        allowedCitationIds,
-        citationRule:
-          "Every support or challenge finding must cite one or more IDs from allowedCitationIds only. Never cite unavailableSourceIds and never invent a source ID. Missing coverage belongs in unknowns.",
-        previousThesis: options.previous,
-      }),
-    }],
-  });
-
-  const calls = output.filter(item => item.type === "function_call");
-  if (calls.length !== 1 || calls[0].name !== "finish_review" || !calls[0].arguments) throw new Error("review_invalid_call");
-
-  const review = schema.parse(JSON.parse(calls[0].arguments));
-  const available = new Set(allowedCitationIds);
-
-  const invalidCitationIds = [
-    ...new Set(
-      [...review.support, ...review.challenges].flatMap(finding =>
-        finding.sourceIds.filter(id => !available.has(id))
-      )
-    ),
-  ];
-
-  if (invalidCitationIds.length > 0) {
-    console.warn("research review rejected invalid citations", {
-      invalidCitationIds,
+  const input: unknown[] = [{
+    role: "user",
+    content: JSON.stringify({
+      token: options.task.tokenAddress,
+      question: options.task.question,
+      draft: options.draft,
+      observations: citableSources,
+      unavailableSourceIds,
       allowedCitationIds,
-    });
-    throw new Error("review_invalid_citation");
-  }
-
-  if (options.previous && review.statement !== options.previous.statement) {
-    throw new Error("review_changed_thesis");
-  }
+      citationRule:
+        "Every support or challenge finding must cite one or more IDs from allowedCitationIds only. Never cite unavailableSourceIds and never invent a source ID. Missing coverage belongs in unknowns.",
+      previousThesis: options.previous,
+    }),
+  }];
+  const request = (items: unknown[]) => requestResearchModel({ ...options, instructions,
+    tools: [finish], toolChoice: { type: "function", name: "finish_review" }, input: items,
+  });
+  const output = await request(input);
+  const available = new Set(allowedCitationIds);
+  const review = await validatedSubmission({ ...options, output, input, request,
+    name: "finish_review", prefix: "review", schema,
+    guard: value => {
+      assertCitations(value, ["support", "challenges"], available, "review_invalid_citation");
+      const statement = value && typeof value === "object" ? (value as { statement?: unknown }).statement : null;
+      if (options.previous && typeof statement === "string" && statement.trim() !== options.previous.statement) {
+        throw new Error("review_changed_thesis");
+      }
+    },
+  });
 
   if (
     (review.verdict === "supported" && !review.support.length) ||

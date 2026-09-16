@@ -30,13 +30,19 @@ export type ResearchReport = {
   sources: ResearchSource[]; changes: string[];
   thesis?: ResearchThesis | null;
   reviewStatus?: "complete" | "not_configured" | "unavailable";
-  steps: { tool: string; status: "complete" | "unavailable"; note: string }[];
+  steps: { tool: string; status: "complete" | "unavailable"; note: string; code?: string }[];
 };
 export type ResearchRun = {
   id: string; assignmentId: string; status: "queued" | "running" | "complete" | "partial" | "failed" | "blocked";
   requestedAt: number; finishedAt: number | null; error: string | null; report: ResearchReport | null;
 };
 export const RESEARCH_LIMITS = { assignments: 5, dailyPerHolder: 12, dailySite: 100, cooldownMs: 60_000, maxQuestion: 1200 };
+// Explicit vocabulary: a short arbitrary provider message is not automatically safe to store.
+const FAILURE_CODE = /^(?:analysis_(?:http_[1-5][0-9]{2}|timeout|network_error|unavailable|empty|too_large|incomplete(?:_max_output_tokens|_content_filter)?|invalid_(?:response|arguments|call|shape|citation|tool)|budget_exhausted)|review_(?:invalid_(?:call|arguments|shape|citation|comparison)|changed_thesis|missing_evidence)|check_unavailable|assignment_not_found|unknown_research_tool)$/;
+export function failureCode(error: unknown, fallback: "check_unavailable" | "analysis_unavailable" = "check_unavailable") {
+  const message = error instanceof Error ? error.message : "";
+  return FAILURE_CODE.test(message) ? message : fallback;
+}
 export function cadenceMs(cadence: ResearchCadence) { return cadence === "hourly" ? 3_600_000 : cadence === "daily" ? 86_400_000 : null; }
 export function validTaskInput(value: unknown) {
   if (!value || typeof value !== "object") throw new Error("invalid_assignment");
