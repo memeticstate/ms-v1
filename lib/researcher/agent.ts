@@ -1,17 +1,24 @@
 import { z } from "zod";
 import type { ResearchAnalysis, ResearchSource, ResearchTask } from "./model";
+import { assertCitations, capped, validatedSubmission, type ModelOutput, type RepairBudget } from "./submission";
 
-export function researchModelConfig(bindings: Record<string, unknown>) {
+// Preserve the deployed ceiling; installations can explicitly raise it for reasoning models.
+export const DEFAULT_MAX_OUTPUT_TOKENS = 1600;
+export type ResearchModelConfig = { key: string; model: string; maxOutputTokens?: number; runtime?: "single-pass" };
+
+export function researchModelConfig(bindings: Record<string, unknown>): ResearchModelConfig | null {
   const key = typeof bindings.OPENAI_API_KEY === "string" ? bindings.OPENAI_API_KEY.trim() : "";
   const model = typeof bindings.MEMETIC_RESEARCH_MODEL === "string" ? bindings.MEMETIC_RESEARCH_MODEL.trim() : "";
   const runtime = bindings.MEMETIC_RESEARCH_RUNTIME === "single-pass" ? ("single-pass" as const) : null;
-  return key && model ? { key, model, ...(runtime ? { runtime } : {}) } : null;
+  const requested = Number(bindings.MEMETIC_RESEARCH_MAX_OUTPUT_TOKENS);
+  const maxOutputTokens = Number.isInteger(requested) && requested >= 512 && requested <= 32_000 ? requested : DEFAULT_MAX_OUTPUT_TOKENS;
+  return key && model ? { key, model, maxOutputTokens, ...(runtime ? { runtime } : {}) } : null;
 }
 const text = z.string().trim().min(1).max(1200);
 const analysisSchema = z.object({
   answer: text,
-  findings: z.array(z.object({ claim: text, sourceIds: z.array(z.string().max(20)).min(1).max(4) }).strict()).max(5),
-  unknowns: z.array(text).min(1).max(5), nextChecks: z.array(text).min(1).max(4),
+  findings: capped(z.object({ claim: text, sourceIds: z.array(z.string().max(20)).min(1).max(4) }).strict(), 5),
+  unknowns: capped(text, 5, 1), nextChecks: capped(text, 4, 1),
 }).strict();
 const strings = { type: "array", items: { type: "string" } };
 const finish = { type: "function", name: "finish_research", description: "Finish with an evidence-grounded answer. Cite source IDs for each finding. Explain gaps instead of inventing an answer.", strict: true,
@@ -27,7 +34,7 @@ Separate observations from interpretation. Historical evidence must be described
 Use plain language with a short answer, up to five findings each citing existing source IDs, explicit unknowns, and up to four useful next checks. No invented sources, price predictions, Markdown links, or unsupported facts. If the question goes beyond these sources (social news, contract audits, other chains), say which parts cannot be answered. Refer to supplied changes cautiously: windows may overlap and the metrics are observations, not proof of causality.`;
 
 export async function requestResearchModel(options: {
-  config: { key: string; model: string }; instructions: string; input: unknown[];
+  config: ResearchModelConfig; instructions: string; input: unknown[];
   tools: unknown[]; toolChoice: unknown; deadline: number; fetcher?: typeof fetch;
 }) {
   const remaining = options.deadline - Date.now();
@@ -39,22 +46,70 @@ export async function requestResearchModel(options: {
       headers: { Authorization: `Bearer ${options.config.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: options.config.model, instructions: options.instructions, input: options.input,
         tools: options.tools, tool_choice: options.toolChoice, parallel_tool_calls: false,
-        reasoning: { effort: "low" }, max_output_tokens: 1600, store: false }),
+        reasoning: { effort: "low" }, max_output_tokens: options.config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS, store: false }),
     });
-    if (!response.ok || Number(response.headers.get("content-length") ?? 0) > 100_000) throw new Error("analysis_unavailable");
-    const reader = response.body?.getReader(); if (!reader) throw new Error("analysis_empty");
-    let size = 0, body = ""; const decoder = new TextDecoder();
-    try { while (true) { const chunk = await reader.read(); if (chunk.done) break; size += chunk.value.byteLength; if (size > 100_000) throw new Error("analysis_too_large"); body += decoder.decode(chunk.value, { stream: true }); } body += decoder.decode(); }
-    finally { await reader.cancel().catch(() => undefined); }
-    const payload = JSON.parse(body) as { status?: string; output?: { type: string; name?: string; call_id?: string; arguments?: string }[] };
-    if (payload.status !== "completed" || !Array.isArray(payload.output)) throw new Error("analysis_incomplete");
-    return payload.output;
+    let body: string;
+    try { body = await readModelBody(response); }
+    catch (error) {
+      // Preserve HTTP diagnostics even when its error body is oversized or absent.
+      if (!response.ok && !controller.signal.aborted) throw new Error(`analysis_http_${response.status}`);
+      throw error;
+    }
+    if (!response.ok) {
+      // Never log provider messages: they can echo private prompts or credentials.
+      // Read the bounded body to distinguish provider error types in operator logs.
+      let providerType: string | undefined;
+      try {
+        const type = JSON.parse(body)?.error?.type;
+        if (typeof type === "string" && /^[a-z_]{1,60}$/.test(type)) providerType = type;
+      } catch { /* Non-JSON proxy errors still retain the HTTP status. */ }
+      console.error("research model request rejected", { status: response.status, providerType });
+      throw new Error(`analysis_http_${response.status}`);
+    }
+    let payload;
+    try { payload = JSON.parse(body); }
+    catch { throw new Error("analysis_invalid_response"); }
+    if (payload?.status !== "completed" || !Array.isArray(payload.output)) {
+      const reason = payload?.incomplete_details?.reason;
+      const code = reason === "max_output_tokens" || reason === "content_filter"
+        ? `analysis_incomplete_${reason}` : "analysis_incomplete";
+      throw new Error(code);
+    }
+    if (payload.output.some((item: unknown) => !item || typeof item !== "object" || typeof (item as { type?: unknown }).type !== "string")) {
+      throw new Error("analysis_invalid_response");
+    }
+    return payload.output as ModelOutput;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("analysis_timeout");
+    if (error instanceof TypeError) throw new Error("analysis_network_error");
+    throw error;
   } finally { clearTimeout(timer); }
 }
 
+async function readModelBody(response: Response) {
+  if (Number(response.headers.get("content-length") ?? 0) > 100_000) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("analysis_too_large");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("analysis_empty");
+  let size = 0, body = "";
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > 100_000) throw new Error("analysis_too_large");
+      body += decoder.decode(chunk.value, { stream: true });
+    }
+    return body + decoder.decode();
+  } finally { await reader.cancel().catch(() => undefined); }
+}
+
 export async function runResearchSynthesis(options: {
-  config: { key: string; model: string }; task: ResearchTask; sources: ResearchSource[]; changes: string[];
-  deadline: number; fetcher?: typeof fetch;
+  config: ResearchModelConfig; task: ResearchTask; sources: ResearchSource[]; changes: string[];
+  deadline: number; fetcher?: typeof fetch; repairBudget?: RepairBudget;
 }): Promise<ResearchAnalysis> {
   const citableSources = options.sources.filter(
     source => source.freshness !== "unavailable"
@@ -79,56 +134,21 @@ export async function runResearchSynthesis(options: {
     }),
   }];
 
-  const output = await requestResearchModel({
-    config: options.config,
-    instructions: INSTRUCTIONS,
-    input,
-    tools: [finish],
+  const request = (items: unknown[]) => requestResearchModel({ ...options,
+    instructions: INSTRUCTIONS, input: items, tools: [finish],
     toolChoice: { type: "function", name: "finish_research" },
-    deadline: options.deadline,
-    fetcher: options.fetcher,
   });
-
-  const calls = output.filter(item => item.type === "function_call");
-  if (calls.length !== 1 || calls[0].name !== "finish_research" || !calls[0].arguments) {
-    throw new Error("analysis_invalid_call");
-  }
-
-  const analysis = analysisSchema.parse(JSON.parse(calls[0].arguments));
+  const output = await request(input);
   const allowed = new Set(allowedCitationIds);
-
-  const invalidCitationIds = [
-    ...new Set(
-      analysis.findings.flatMap(finding =>
-        finding.sourceIds.filter(id => !allowed.has(id))
-      )
-    ),
-  ];
-
-  const findings = analysis.findings.filter(
-    finding =>
-      finding.sourceIds.length > 0 &&
-      finding.sourceIds.every(id => allowed.has(id))
-  );
-
-  if (invalidCitationIds.length > 0) {
-    console.warn("research synthesis rejected invalid citations", {
-      invalidCitationIds,
-      allowedCitationIds,
-      droppedFindings: analysis.findings.length - findings.length,
-    });
-  }
-
-  if (analysis.findings.length > 0 && findings.length === 0) {
-    throw new Error("analysis_invalid_citation");
-  }
-
-  return { ...analysis, findings };
+  return validatedSubmission({ ...options, output, input, request, name: "finish_research", prefix: "analysis",
+    schema: analysisSchema,
+    guard: value => assertCitations(value, ["findings"], allowed, "analysis_invalid_citation"),
+  });
 }
 
 export async function runResearchAgent(options: {
-  config: { key: string; model: string }; task: ResearchTask; sources: ResearchSource[]; changes: string[];
-  read: (name: string) => Promise<ResearchSource>; deadline: number; fetcher?: typeof fetch;
+  config: ResearchModelConfig; task: ResearchTask; sources: ResearchSource[]; changes: string[];
+  read: (name: string) => Promise<ResearchSource>; deadline: number; fetcher?: typeof fetch; repairBudget?: RepairBudget;
 }): Promise<ResearchAnalysis> {
   const input: unknown[] = [{ role: "user", content: JSON.stringify({ token: options.task.tokenAddress, question: options.task.question, focus: options.task.focus, observations: options.sources, changes: options.changes }) }];
   const seen = new Set<string>();
@@ -141,12 +161,17 @@ export async function runResearchAgent(options: {
     if (calls.length !== 1) throw new Error("analysis_invalid_call");
     const call = calls[0];
     if (!call.call_id || !call.arguments) throw new Error("analysis_invalid_call");
-    const args = JSON.parse(call.arguments);
+    let args: unknown;
+    try { args = JSON.parse(call.arguments); }
+    catch { throw new Error("analysis_invalid_arguments"); }
     if (call.name === "finish_research") {
-      const analysis = analysisSchema.parse(args);
       const allowed = new Set(availableSources.filter(s => s.freshness !== "unavailable").map(s => s.id));
-      if (analysis.findings.some(f => f.sourceIds.some(id => !allowed.has(id)))) throw new Error("analysis_invalid_citation");
-      return analysis;
+      return validatedSubmission({ ...options, output, input, name: "finish_research", prefix: "analysis",
+        schema: analysisSchema,
+        guard: value => assertCitations(value, ["findings"], allowed, "analysis_invalid_citation"),
+        request: items => requestResearchModel({ ...options, instructions: INSTRUCTIONS, input: items,
+          tools: [finish], toolChoice: { type: "function", name: "finish_research" } }),
+      });
     }
     if (turn === 2 || !toolDefinitions.some(t => t.name === call.name) || seen.has(call.name!) || !args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length) throw new Error("analysis_invalid_tool");
     seen.add(call.name!);

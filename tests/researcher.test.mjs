@@ -21,9 +21,9 @@ const { ResearchStore } = await vite.ssrLoadModule("/db/researcher.ts");
 const { researcherResponse } = await vite.ssrLoadModule("/lib/researcher/http.ts");
 const { runNextResearch } = await vite.ssrLoadModule("/lib/researcher/runner.ts");
 const { investigate } = await vite.ssrLoadModule("/lib/researcher/engine.ts");
-const { runResearchAgent, researchModelConfig } = await vite.ssrLoadModule("/lib/researcher/agent.ts");
+const { runResearchAgent, runResearchSynthesis, requestResearchModel, researchModelConfig, DEFAULT_MAX_OUTPUT_TOKENS } = await vite.ssrLoadModule("/lib/researcher/agent.ts");
 const { reviewResearch, previousThesis, hasNewReviewEvidence } = await vite.ssrLoadModule("/lib/researcher/review.ts");
-const { compareSources, validTaskInput } = await vite.ssrLoadModule("/lib/researcher/model.ts");
+const { compareSources, validTaskInput, failureCode } = await vite.ssrLoadModule("/lib/researcher/model.ts");
 const { marketSource, curveSource, recentTimestamp } = await vite.ssrLoadModule("/lib/researcher/sources.ts");
 const store = new ResearchStore(db), token = "0x" + "a".repeat(40);
 const input = { tokenAddress: token, question: "Is participation broadening?", focus: "participation", cadence: "manual" };
@@ -260,4 +260,169 @@ test("evidence-only mode carries memory without claiming a review happened", asy
   const task = await store.create("alice", input), prior = (await makeReview(task)).thesis;
   const result = await investigate(task, { ...report, thesis: prior }, { lookup: async () => null, dossier: async () => null, recent: async () => ({ check: null }), config: null, deadline: Date.now() + 10000 });
   assert.equal(result.reviewStatus, "not_configured"); assert.deepEqual(result.thesis, prior); assert.equal(result.analysis, null);
+});
+
+const modelOptions = () => ({ config: { key: "secret", model: "model" }, instructions: "test", input: [], tools: [], toolChoice: "required", deadline: Date.now() + 10000 });
+const researchOptions = () => ({ ...modelOptions(), task: { ...input, id: "task" }, sources: [source], changes: [], read: async () => { throw Error("unexpected read"); } });
+
+test("output ceiling is configurable without changing the deployed default, runtime or reasoning effort", async () => {
+  assert.equal(DEFAULT_MAX_OUTPUT_TOKENS, 1600);
+  for (const value of [undefined, "", "bad", 511, 32001, 2400.5]) {
+    assert.equal(researchModelConfig({ OPENAI_API_KEY: "key", MEMETIC_RESEARCH_MODEL: "model", MEMETIC_RESEARCH_MAX_OUTPUT_TOKENS: value }).maxOutputTokens, 1600);
+  }
+  const config = researchModelConfig({ OPENAI_API_KEY: "key", MEMETIC_RESEARCH_MODEL: "model", MEMETIC_RESEARCH_RUNTIME: "single-pass", MEMETIC_RESEARCH_MAX_OUTPUT_TOKENS: "4096" });
+  assert.equal(config.runtime, "single-pass");
+  await requestResearchModel({ ...modelOptions(), config, fetcher: async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.max_output_tokens, 4096); assert.equal(body.reasoning.effort, "low");
+    return output("finish_research", finishArgs);
+  } });
+});
+
+test("provider failures retain stable diagnostics without echoing arbitrary response text", async () => {
+  const cases = [
+    [() => Response.json({ error: { message: "private question secret", type: "rate_limit_error" } }, { status: 429 }), "analysis_http_429"],
+    [() => new Response("private-key", { status: 401 }), "analysis_http_401"],
+    [() => new Response("x".repeat(100001), { status: 503 }), "analysis_http_503"],
+    [() => Response.json({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }), "analysis_incomplete_max_output_tokens"],
+    [() => Response.json({ status: "incomplete", incomplete_details: { reason: "private_provider_message" } }), "analysis_incomplete"],
+    [() => new Response("invalid JSON"), "analysis_invalid_response"],
+    [() => Response.json({ status: "completed", output: [null] }), "analysis_invalid_response"],
+    [() => new Response("x".repeat(100001)), "analysis_too_large"],
+  ];
+  for (const [response, code] of cases) {
+    await assert.rejects(() => requestResearchModel({ ...modelOptions(), fetcher: async () => response() }), { message: code });
+  }
+  for (const message of ["private_provider_message", "sk_secret", "analysis_http_999", "Email: person@example.com"]) assert.equal(failureCode(new Error(message)), "check_unavailable");
+  assert.equal(failureCode(new Error("review_invalid_shape")), "review_invalid_shape");
+  await assert.rejects(() => requestResearchModel({ ...modelOptions(), fetcher: async () => { throw new TypeError("fetch failed with private context"); } }), { message: "analysis_network_error" });
+});
+
+test("deadline expiry and an aborted request both produce an actionable timeout", async () => {
+  await assert.rejects(() => requestResearchModel({ ...modelOptions(), deadline: Date.now(), fetcher: async () => { throw Error("must not call"); } }), { message: "analysis_timeout" });
+  await assert.rejects(() => requestResearchModel({ ...modelOptions(), deadline: Date.now() + 1100, fetcher: async (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+  }) }), { message: "analysis_timeout" });
+});
+
+test("oversized valid lists are trimmed in synthesis, tool research and review", async () => {
+  for (const run of [runResearchSynthesis, runResearchAgent]) {
+    let calls = 0;
+    const result = await run({ ...researchOptions(), fetcher: async () => {
+      calls++; return output("finish_research", { ...finishArgs, findings: Array(6).fill(finishArgs.findings[0]), unknowns: Array(6).fill("Unknown"), nextChecks: Array(6).fill("Check") });
+    } });
+    assert.equal(calls, 1); assert.equal(result.findings.length, 5); assert.equal(result.unknowns.length, 5); assert.equal(result.nextChecks.length, 4);
+  }
+  const reviewed = await makeReview({ ...input }, null, { ...reviewArgs, support: Array(4).fill(finishArgs.findings[0]), reviewNotes: Array(4).fill(reviewArgs.reviewNotes[0]) });
+  assert.equal(reviewed.thesis.support.length, 3); assert.equal(reviewed.thesis.reviewNotes.length, 3);
+});
+
+test("one shape correction preserves reasoning context and forces submission without more tools", async () => {
+  for (const run of [runResearchSynthesis, runResearchAgent]) {
+    let calls = 0;
+    const result = await run({ ...researchOptions(), fetcher: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      if (++calls === 1) return output("finish_research", { ...finishArgs, unknowns: [] }, [{ type: "reasoning", id: "r1", summary: [] }]);
+      assert.equal(body.tool_choice.name, "finish_research"); assert.equal(body.tools.length, 1);
+      assert.ok(body.input.some(item => item.type === "reasoning" && item.id === "r1"));
+      const correction = body.input.find(item => item.type === "function_call_output");
+      assert.equal(correction.call_id, "call1"); assert.equal(JSON.parse(correction.output).error, "invalid_submission");
+      return output("finish_research", finishArgs);
+    } });
+    assert.equal(calls, 2); assert.deepEqual(result, finishArgs);
+  }
+});
+
+test("a second malformed response or insufficient remaining time cannot trigger further retries", async () => {
+  for (const run of [runResearchSynthesis, runResearchAgent]) {
+    for (const [budgetMs, expectedCalls] of [[10000, 2], [3500, 1]]) {
+      let calls = 0;
+      await assert.rejects(() => run({ ...researchOptions(), deadline: Date.now() + budgetMs, fetcher: async () => { calls++; return output("finish_research", { ...finishArgs, unknowns: [] }); } }), { message: "analysis_invalid_shape" });
+      assert.equal(calls, expectedCalls);
+    }
+  }
+});
+
+test("invented citations fail before shape repair, even in findings beyond the display cap", async () => {
+  for (const run of [runResearchSynthesis, runResearchAgent]) {
+    for (const findings of [
+      [{ claim: "Unknown", sourceIds: ["invented"] }],
+      [...Array(5).fill(finishArgs.findings[0]), { claim: "Unknown", sourceIds: ["invented"] }],
+      [{ claim: "Unavailable", sourceIds: ["curve"] }],
+    ]) {
+      let calls = 0;
+      await assert.rejects(() => run({ ...researchOptions(), sources: [source, { ...source, id: "curve", freshness: "unavailable" }], fetcher: async () => { calls++; return output("finish_research", { ...finishArgs, unknowns: [], findings }); } }), { message: "analysis_invalid_citation" });
+      assert.equal(calls, 1);
+    }
+  }
+});
+
+test("review cannot repair away a fabricated citation or moved thesis alongside a shape error", async () => {
+  const previous = (await makeReview({ ...input })).thesis;
+  for (const [args, code] of [
+    [{ ...reviewArgs, statement: "Different claim", unknowns: [] }, "review_changed_thesis"],
+    [{ ...reviewArgs, unknowns: [], support: [...Array(3).fill(finishArgs.findings[0]), { claim: "Unknown", sourceIds: ["invented"] }] }, "review_invalid_citation"],
+  ]) {
+    let calls = 0;
+    await assert.rejects(() => reviewResearch({ ...researchOptions(), previous, draft: finishArgs, fetcher: async () => { calls++; return output("finish_review", args); } }), { message: code });
+    assert.equal(calls, 1);
+  }
+});
+
+test("the tool agent retains newly read evidence when its reader does not mutate the input array", async () => {
+  let calls = 0;
+  const result = await runResearchAgent({ ...researchOptions(), read: async () => ({ ...source, id: "holders" }), fetcher: async () => {
+    if (++calls === 1) return output("inspect_holder_snapshot", {});
+    return output("finish_research", { ...finishArgs, findings: [{ claim: "Dated holder evidence", sourceIds: ["holders"] }] });
+  } });
+  assert.deepEqual(result.findings[0].sourceIds, ["holders"]);
+});
+
+test("single-pass repairs the review and publishes only its checked conclusion", async () => {
+  let calls = 0;
+  const result = await investigate({ ...input }, null, {
+    lookup: async () => null, dossier: async () => null, recent: async () => ({ check: null }),
+    config: { key: "secret", model: "model", runtime: "single-pass", maxOutputTokens: 4096 }, deadline: Date.now() + 55000,
+    fetcher: async (_url, init) => {
+      assert.equal(JSON.parse(init.body).max_output_tokens, 4096);
+      calls++;
+      if (calls === 1) return output("finish_research", { ...finishArgs, findings: [] });
+      return output("finish_review", calls === 2 ? { ...reviewArgs, invalidationConditions: [] } : reviewArgs);
+    },
+  });
+  assert.equal(calls, 3); assert.equal(result.reviewStatus, "complete"); assert.equal(result.analysis.answer, reviewArgs.conclusion);
+});
+
+test("draft and review share one correction budget and failures preserve prior thesis and stored diagnostics", async () => {
+  const task = await store.create("alice", input);
+  const prior = (await makeReview(task)).thesis;
+  let calls = 0;
+  const result = await investigate(task, { ...report, thesis: prior }, {
+    lookup: async () => null, dossier: async () => null, recent: async () => ({ check: null }),
+    config: { key: "secret", model: "model", runtime: "single-pass" }, deadline: Date.now() + 55000,
+    fetcher: async () => {
+      calls++;
+      if (calls < 3) return output("finish_research", { ...finishArgs, findings: [], unknowns: calls === 1 ? [] : finishArgs.unknowns });
+      return output("finish_review", { ...reviewArgs, invalidationConditions: [] });
+    },
+  });
+  assert.equal(calls, 3); assert.equal(result.analysis, null); assert.deepEqual(result.thesis, prior);
+  assert.equal(result.steps.at(-1).tool, "Skeptic & editor"); assert.equal(result.steps.at(-1).code, "review_invalid_shape");
+  await store.enqueue("alice", task.id);
+  await runNextResearch(store, { eligible: async () => true, investigate: async () => result });
+  const saved = (await store.runs("alice", task.id))[0];
+  assert.equal(saved.status, "partial"); assert.equal(saved.error, "review_invalid_shape");
+  assert.deepEqual(saved.report.thesis, prior); assert.equal(saved.report.steps.at(-1).code, saved.error);
+});
+
+test("draft HTTP failures are attributed to the researcher and private error bodies never enter storage", async () => {
+  const task = await store.create("alice", input); await store.enqueue("alice", task.id);
+  await runNextResearch(store, { eligible: async () => true, investigate: task => investigate(task, null, {
+    lookup: async () => null, dossier: async () => null, recent: async () => ({ check: null }),
+    config: { key: "secret", model: "model" }, deadline: Date.now() + 55000,
+    fetcher: async () => Response.json({ error: { message: "DO_NOT_STORE_PROVIDER_TEXT" } }, { status: 429 }),
+  }) });
+  const saved = (await store.runs("alice", task.id))[0];
+  assert.equal(saved.error, "analysis_http_429"); assert.equal(saved.report.steps.at(-1).tool, "Researcher");
+  assert.doesNotMatch(JSON.stringify(saved), /DO_NOT_STORE_PROVIDER_TEXT/);
 });
