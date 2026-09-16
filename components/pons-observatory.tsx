@@ -453,7 +453,7 @@ function PonsGravityField({ pair, cohort, launches, selected, onSelect }: {
   const visible = launches.slice(currentPage * 20, (currentPage + 1) * 20);
   const centerColor = pair === "ALL" ? "var(--signal)" : cohort?.color ?? "var(--signal)";
   return (
-    <section className="pons-field relative min-h-[570px] overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-depth)]/88 lg:min-h-[660px]">
+    <section className="pons-field relative h-[540px] self-start overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-depth)]/88 lg:h-[600px]">
       <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 border-b border-foreground/10 bg-[var(--surface-1)]/82 px-4 py-3 backdrop-blur-md">
         <div>
           <div className="flex items-center gap-2">
