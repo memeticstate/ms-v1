@@ -44,6 +44,8 @@ import { FieldGuide, GuidedReading } from "@/components/field-guide";
 import { useMemeticAuth } from "@/components/memetic-auth-provider";
 import { ResearchPassport } from "@/components/research-passport";
 import { TokenSearch } from "@/components/token-search";
+import { CohortStrip } from "./cohort-strip";
+import { TokenLabel, CopyContract } from "./token-identity";
 import { TokenAvatar } from "@/components/token-avatar";
 import { TokenOverview } from "@/components/token-overview";
 import { tokenText, tokenTitle, type TokenSearchResult } from "@/lib/tokens/model";
@@ -298,7 +300,7 @@ function ProtocolPulse({ state, onLeader, onMetric }: { state: PonsStateResponse
             <button type="button" onClick={() => onLeader(pulse.leader!.tokenAddress)}
               className="group rounded border border-attention/20 bg-attention/[0.045] px-3 py-2.5 text-left transition hover:border-attention/35">
               <span className="block font-medium text-xs tracking-normal text-muted-foreground">Most active launch</span>
-              <span className="mt-1 flex items-center gap-2 font-mono text-caption text-attention">{pulse.leader.tokenSymbol} <i className="text-muted-foreground not-italic">{quoteAssetLabel(pulse.leader.pairSymbol)} · {pulse.leader.recentTrades} trades</i><ArrowUpRight className="size-3 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span>
+              <span className="mt-1 flex items-center gap-2 font-mono text-caption text-attention"><TokenLabel token={{ tokenAddress: pulse.leader.tokenAddress, symbol: pulse.leader.tokenSymbol, name: null }} showName={false} /> <i className="text-muted-foreground not-italic">{quoteAssetLabel(pulse.leader.pairSymbol)} · {pulse.leader.recentTrades} trades</i><ArrowUpRight className="size-3 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span>
             </button>
           ) : <span className="font-medium text-xs tracking-normal text-muted-foreground">Pulse warming</span>}
         </div>
@@ -396,42 +398,12 @@ function ProtocolHistoryPanel({ state }: { state: PonsStateResponse }) {
       <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/86">
         <div className="flex items-center justify-between gap-4 border-b border-foreground/10 px-4 py-3 sm:px-5"><div><p className="font-medium text-xs tracking-normal text-muted-foreground">V1 launch ledger</p><p className="mt-1 text-caption text-muted-foreground">Most recent committed launches across both canonical factories</p></div><span className="font-medium text-xs tracking-normal text-muted-foreground">finality {history.finalityBlocks} blocks</span></div>
         <Button variant="outline" className="m-3" onClick={() => setAscending(!ascending)}>{ascending ? "Oldest first ↑" : "Newest first ↓"}</Button>
-        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-medium text-xs tracking-normal text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><p className="font-medium text-foreground/70">{launch.symbol || short(launch.tokenAddress)}</p><p className="mt-0.5 font-mono text-xs text-muted-foreground">{launch.name || short(launch.tokenAddress)}</p></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={robinhoodExplorer.tx(launch.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-xs tracking-normal text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-medium text-xs tracking-normal text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
+        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-medium text-xs tracking-normal text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><TokenLabel token={launch} /><CopyContract address={launch.tokenAddress} className="mt-1" /></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={robinhoodExplorer.tx(launch.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-xs tracking-normal text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-medium text-xs tracking-normal text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
       </section>
     </div>
   );
 }
 
-function CohortStrip({ cohorts, activePair, onPair }: {
-  cohorts: PonsPairCohort[];
-  activePair: string;
-  onPair: (pair: string) => void;
-}) {
-  const ordered = [...cohorts].sort((left, right) => {
-    if (left.symbol === "NVDA") return -1;
-    if (right.symbol === "NVDA") return 1;
-    return right.attentionScore - left.attentionScore;
-  });
-  return (
-    <div className="mb-3 flex gap-1.5 overflow-x-auto rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/75 p-2 [scrollbar-width:none]">
-      <button type="button" onClick={() => onPair("ALL")}
-        className={`cohort-pill ${activePair === "ALL" ? "cohort-pill-active" : ""}`}>
-        <span>All PONS</span><small>{cohorts.length} quote assets</small>
-      </button>
-      {ordered.map((cohort) => (
-        <button type="button" key={`${cohort.symbol}:${cohort.address}`} onClick={() => onPair(cohort.symbol)}
-          className={`cohort-pill ${activePair === cohort.symbol ? "cohort-pill-active" : ""}`}
-          style={activePair === cohort.symbol ? { "--cohort-color": cohort.color } as React.CSSProperties : undefined}>
-          <span className="flex items-center gap-1.5">
-            <i className="size-1.5 rounded-full" style={{ backgroundColor: cohort.color }} />{quoteAssetLabel(cohort.symbol)}
-            {cohort.symbol === "NVDA" ? <em>flagship</em> : null}
-          </span>
-          <small>{cohort.recentTrades} recent trades · {signalMeta[cohort.signal].label}</small>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function launchPosition(index: number, total: number, score: number) {
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -527,7 +499,7 @@ function PonsGravityField({ pair, cohort, launches, selected, onSelect }: {
                 filter={active ? "url(#ponsNodeGlow)" : undefined} />
               <circle cx={x - radius * 0.25} cy={y - radius * 0.23} r={Math.max(3, radius * 0.18)} fill={launch.pairColor} opacity={launch.phase === "graduated" ? 1 : 0.62} />
               <text x={x} y={y + 3} textAnchor="middle" fill="var(--foreground)" fontFamily="IBM Plex Mono, monospace" fontSize="13" fontWeight="700">
-                {launch.symbol.slice(0, 8)}
+                {tokenTitle(launch).slice(0, 12)}
               </text>
               <text x={x} y={y + radius + 13} textAnchor="middle" fill={active ? launch.pairColor : "var(--slate)"} fontFamily="IBM Plex Mono, monospace" fontSize="13">
                 {launch.research?.eligible ? "Current" : "Indexed"} · {compact.format(launch.trades)} trades
@@ -541,7 +513,7 @@ function PonsGravityField({ pair, cohort, launches, selected, onSelect }: {
         {visible.length ? visible.map((launch) => (
           <button type="button" key={launch.tokenAddress} onClick={() => onSelect(launch)}
             className={`shrink-0 rounded border px-2.5 py-2 text-left transition ${selected?.tokenAddress === launch.tokenAddress ? "border-foreground/25 bg-foreground/10" : "border-foreground/8 bg-foreground/[0.025] hover:border-foreground/15"}`}>
-            <span className="block font-mono text-xs font-semibold" style={{ color: launch.pairColor }}>{launch.symbol}</span>
+            <span className="block font-mono text-xs font-semibold" style={{ color: launch.pairColor }}><TokenLabel token={launch} showName={false} /></span>
             <span className="mt-0.5 block font-medium text-xs tracking-normal text-muted-foreground">{launch.uniqueTraders} actors · {launch.phase}</span>
           </button>
         )) : <p className="px-2 py-2 text-xs text-muted-foreground">No launch records are loaded for this habitat in the selected indexed window. Try a wider research window.</p>}
@@ -685,9 +657,9 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
             <span className="rounded border px-2 py-1 font-medium text-xs tracking-normal" style={{ color: phaseColor, borderColor: `color-mix(in srgb, ${phaseColor} 34%, transparent)`, backgroundColor: `color-mix(in srgb, ${phaseColor} 7%, transparent)` }}>{launch.phase}</span>
             <span className="font-medium text-xs tracking-normal text-muted-foreground">{quoteAssetLabel(launch.pairSymbol)} habitat</span>
           </div>
-          <h2 className="specimen-serif mt-4 break-words text-4xl tracking-[-0.035em] text-foreground/92">{launch.symbol === "—" ? "Token" : launch.symbol}</h2>
-          <p className="mt-1 text-sm text-foreground/60">{launch.name}</p>
-          <a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" className="mt-2 inline-block font-mono text-xs underline text-foreground/65">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a>
+          <h2 className="specimen-serif mt-4 break-words text-4xl tracking-[-0.035em] text-foreground/92"><TokenLabel token={launch} /></h2>
+          <CopyContract address={launch.tokenAddress} className="mt-2" />
+          <a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" className="mt-2 inline-block font-mono text-xs underline text-foreground/65">View contract <ExternalLink className="inline size-3" aria-hidden="true" /></a>
           <a href={`https://www.ponsfamily.com/launchpad/${launch.tokenAddress}`} target="_blank" rel="noreferrer" className="ml-3 text-xs underline text-attention">PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a>
         </div>
         <ScoreRing score={launch.research?.score ?? null} color={scoreTone(launch.attentionScore)} />
@@ -818,8 +790,8 @@ function exportSignalSnapshot(launches: PonsLaunchView[], state: PonsStateRespon
 function TokenIdentity({ launch }: { launch: PonsLaunchView }) {
   return <div className="flex items-center gap-3">
     <a href={`https://www.ponsfamily.com/launchpad/${launch.tokenAddress}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Open this token on PONS" aria-label={`Open ${launch.symbol} on PONS`} className="shrink-0"><TokenAvatar token={launch} className="grid size-10 place-items-center overflow-hidden rounded border border-foreground/15 bg-signal/10 font-mono text-xs text-attention" /></a>
-    <div className="min-w-0"><p className="truncate text-sm"><strong>{tokenTitle(launch)}</strong> <span className="text-muted-foreground">{tokenText(launch.name)}</span></p>
-    <p className="mt-1 font-mono text-caption text-muted-foreground"><a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="underline hover:text-foreground">{short(launch.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a> · {quoteAssetLabel(launch.pairSymbol)}</p></div>
+    <div className="min-w-0"><p className="truncate text-sm"><TokenLabel token={launch} /></p>
+    <div className="mt-1 flex items-center gap-2 text-caption text-muted-foreground"><CopyContract address={launch.tokenAddress} />{quoteAssetLabel(launch.pairSymbol)}</div></div>
   </div>;
 }
 
@@ -917,7 +889,7 @@ function PonsTape({ events, onInspect, state }: { events: PonsTapeEvent[]; onIns
           {[...events].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((event) => (
             <article key={event.id} className="grid gap-3 px-4 py-3.5 transition hover:bg-foreground/[0.02] sm:grid-cols-[115px_minmax(0,1fr)_140px] sm:items-center">
               <div className="flex items-center gap-2"><span className="size-1.5 rounded-full" style={{ backgroundColor: eventColor[event.eventType] }} /><span className="font-medium text-xs tracking-normal" style={{ color: eventColor[event.eventType] }}>{event.eventType}</span></div>
-              <button type="button" onClick={() => onInspect(event.tokenAddress)} aria-label={`Inspect ${event.tokenSymbol === "—" ? short(event.tokenAddress) : event.tokenSymbol} evidence`} className="min-w-0 text-left hover:underline"><p className="truncate text-sm text-foreground/70"><strong className="font-mono text-caption text-foreground/90">{event.tokenSymbol}</strong> <span className="text-muted-foreground">{event.detail}</span></p><p className="mt-1 truncate font-medium text-xs tracking-normal text-muted-foreground">{quoteAssetLabel(event.pairSymbol)} · token {short(event.tokenAddress)}</p></button>
+              <button type="button" onClick={() => onInspect(event.tokenAddress)} aria-label={`Inspect ${tokenTitle({ tokenAddress: event.tokenAddress, symbol: event.tokenSymbol, name: null })} evidence`} className="min-w-0 text-left hover:underline"><p className="truncate text-sm text-foreground/70"><strong className="font-mono text-caption text-foreground/90"><TokenLabel token={{ tokenAddress: event.tokenAddress, symbol: event.tokenSymbol, name: null }} /></strong> <span className="text-muted-foreground">{event.detail}</span></p><p className="mt-1 truncate font-medium text-xs tracking-normal text-muted-foreground">{quoteAssetLabel(event.pairSymbol)}</p></button>
               <a href={robinhoodExplorer.tx(event.txHash)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 font-medium text-xs tracking-normal text-muted-foreground hover:text-muted-foreground sm:justify-end"><span>#{integer.format(event.blockNumber)} · {relativeTime(event.observedAt)}</span><ExternalLink className="size-3" /></a>
             </article>
           ))}
@@ -1608,7 +1580,7 @@ export function PonsObservatory({ experience = "observe" }: { experience?: Obser
           <DialogTitle className="px-3 pt-2">Inspect evidence{selected ? ` · ${selected.symbol === "—" ? selected.name : selected.symbol}` : ""}</DialogTitle>
           <DialogDescription className="px-3">The same dated evidence, from every view.</DialogDescription>
           {selectedAddress ? <TokenOverview key={selectedAddress} address={selectedAddress} indexed={Boolean(selected)} onIdentity={setSelectedIdentity} /> : null}
-          {factoryEvent ? <section className="rounded-lg border border-signal/20 p-4 text-sm leading-7"><p className="font-semibold text-signal">{factoryEvent.detail}</p><p>{factoryEvent.tokenSymbol === "—" ? "Token identity is being resolved" : factoryEvent.tokenSymbol} · {quoteAssetLabel(factoryEvent.pairSymbol)} habitat</p><p>Block {integer.format(factoryEvent.blockNumber)} · {new Date(factoryEvent.observedAt).toUTCString()}</p><p className="mt-2 text-muted-foreground">This factory event is confirmed independently. Trade activity, holder retention and present relevance require separate evidence; the event itself earns no attention score.</p><div className="mt-3 flex flex-wrap gap-4"><a className="underline" href={robinhoodExplorer.tx(factoryEvent.txHash)} target="_blank" rel="noreferrer">Inspect transaction <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={robinhoodExplorer.address(factoryEvent.tokenAddress)} target="_blank" rel="noreferrer">{short(factoryEvent.tokenAddress)} <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={`https://www.ponsfamily.com/launchpad/${factoryEvent.tokenAddress}`} target="_blank" rel="noreferrer">Open PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a></div></section> : null}
+          {factoryEvent ? <section className="rounded-lg border border-signal/20 p-4 text-sm leading-7"><p className="font-semibold text-signal">{factoryEvent.detail}</p><p>{factoryEvent.tokenSymbol === "—" ? "Token identity is being resolved" : factoryEvent.tokenSymbol} · {quoteAssetLabel(factoryEvent.pairSymbol)} habitat</p><p>Block {integer.format(factoryEvent.blockNumber)} · {new Date(factoryEvent.observedAt).toUTCString()}</p><p className="mt-2 text-muted-foreground">This factory event is confirmed independently. Trade activity, holder retention and present relevance require separate evidence; the event itself earns no attention score.</p><div className="mt-3 flex flex-wrap gap-4"><a className="underline" href={robinhoodExplorer.tx(factoryEvent.txHash)} target="_blank" rel="noreferrer">Inspect transaction <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={robinhoodExplorer.address(factoryEvent.tokenAddress)} target="_blank" rel="noreferrer">View contract <ExternalLink className="inline size-3" aria-hidden="true" /></a><a className="underline" href={`https://www.ponsfamily.com/launchpad/${factoryEvent.tokenAddress}`} target="_blank" rel="noreferrer">Open PONS <ExternalLink className="inline size-3" aria-hidden="true" /></a></div></section> : null}
           {selected ? <LaunchDossier launch={selected} saved={isSaved(selected.tokenAddress)} onToggleSave={toggleWatch} /> : null}
           {selectedAddress ? <a href={appTokenHref("research", selectedAddress)} className="inline-flex items-center justify-center gap-2 rounded border border-foreground/15 px-4 py-3 text-sm hover:bg-foreground/5"><ShieldCheck className="size-4" />Ask about this token · Holder access</a> : null}
         </DialogContent></Dialog>

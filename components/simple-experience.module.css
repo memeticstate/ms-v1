@@ -72,7 +72,7 @@
 .tokenAvatar[data-tone=verified] { background: radial-gradient(ellipse at 18% 12%, #d1eb9f25, transparent 70%), linear-gradient(140deg, #354a38, #17242c); }
 .tokenAvatar[data-tone=stress] { background: radial-gradient(ellipse at 18% 12%, #e5bd6b30, transparent 70%), linear-gradient(140deg, #4b3a30, #22252b); }
 .rowIdentity { min-width: 0; flex: 1; padding-right: 4px; }
-.rowIdentity strong { display: block; font-size: 19px; line-height: 1.2; font-weight: 600; letter-spacing: -.035em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowIdentity strong { color: var(--foreground); display: block; font-size: 19px; line-height: 1.2; font-weight: 600; letter-spacing: -.035em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rowIdentity > span { display: block; color: var(--muted-foreground); font-size: 12px; line-height: 1.4; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tokenMeta { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 9px; line-height: 1.4; color: var(--muted-foreground); white-space: nowrap; }
 .tokenMeta > span:first-child { padding: 2px 5px; background: var(--surface-3); border-radius: 4px; font-size: 8px; font-weight: 600; color: var(--foreground); max-width: 58px; overflow: hidden; text-overflow: ellipsis; }
@@ -107,7 +107,7 @@
 .feedGrid[data-layout=list] .tokenAvatar { width: 50px; height: 50px; border-radius: 13px; font-size: 20px; }
 .feedGrid[data-layout=list] .rowIdentity strong { font-size: 16px; }
 .feedGrid[data-layout=list] .tokenMeta { margin-top: 5px; }
-.feedGrid[data-layout=list] .tokenMeta > span:last-child { display: none; }
+
 .feedGrid[data-layout=list] .rowState { margin: 0; align-items: flex-start; flex-direction: column; gap: 7px; }
 .feedGrid[data-layout=list] .cardMetrics { margin: 0; padding: 0; border: 0; gap: 16px; }
 .feedGrid[data-layout=list] .rowMetric strong { font-size: 18px; }

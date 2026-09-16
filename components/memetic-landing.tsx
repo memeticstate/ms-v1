@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, ArrowRight, RefreshCw } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
+import { TokenLabel, CopyContract } from "./token-identity";
 import { TokenAvatar } from "@/components/token-avatar";
 import { TokenSearch } from "@/components/token-search";
 import { FactoryActivity } from "@/components/factory-activity";
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { currentPonsEvidence } from "@/lib/pons/research";
 import { tokenAppHref } from "@/lib/pons/landing";
 import type { PonsStateResponse } from "@/lib/pons/model";
-import { shortTokenAddress, tokenTitle, tokenSubtitle, type TokenDiscoveryResponse } from "@/lib/tokens/model";
+import { tokenTitle, tokenSubtitle, type TokenDiscoveryResponse } from "@/lib/tokens/model";
 import { radarReadings, within, type RadarReading } from "@/lib/tokens/radar";
 import styles from "./memetic-landing.module.css";
 
@@ -35,8 +36,9 @@ function EvidencePreview({ item }: { item: RadarReading }) {
       <div><dt>What remains uncertain</dt><dd>{item.uncertainty}</dd></div>
     </dl>
     <Button asChild className={styles.evidenceButton}><a href={tokenAppHref(item.token.tokenAddress)}>{item.kind === "research" ? "Inspect full evidence" : "Open token details"} <ArrowUpRight aria-hidden="true" /></a></Button>
+    <CopyContract address={item.token.tokenAddress} />
     <p className={styles.readingTime}>{item.evidenceLabel}: {dateLabel(item.evidenceAt)}</p>
-    <a className={styles.contractLink} href={robinhoodExplorer.address(item.token.tokenAddress)} target="_blank" rel="noreferrer">{shortTokenAddress(item.token.tokenAddress)} <ArrowUpRight aria-hidden="true" /></a>
+    <a className={styles.contractLink} href={robinhoodExplorer.address(item.token.tokenAddress)} target="_blank" rel="noreferrer">View contract <ArrowUpRight aria-hidden="true" /></a>
   </aside>;
 }
 
@@ -198,7 +200,7 @@ export function MemeticLanding() {
                 {items.map((item) => <div key={item.token.tokenAddress} className={styles.signalRow} data-selected={active?.token.tokenAddress === item.token.tokenAddress}>
                   <button type="button" className={styles.rowSelect} aria-pressed={active?.token.tokenAddress === item.token.tokenAddress} aria-controls="landing-reading" onClick={() => selectReading(item.token.tokenAddress)} aria-label={`Preview ${tokenTitle(item.token)}: ${item.summary}`}>
                     <TokenAvatar token={item.token} className={styles.avatar} tone={item.tone} />
-                    <span className={styles.tokenIdentity}><strong>{tokenTitle(item.token)}</strong><span>{tokenSubtitle(item.token)}</span><code>{shortTokenAddress(item.token.tokenAddress)}</code></span>
+                    <span className={styles.tokenIdentity}><TokenLabel token={item.token} /></span>
                     <span className={styles.signalSummary}>{item.summary}</span>
                     <span className={styles.badge} data-tone={item.tone}>{item.label}</span>
                   </button>
@@ -226,7 +228,7 @@ export function MemeticLanding() {
     <footer className={styles.footer}>
       <p>Attention moves. <em>Keep the evidence.</em></p>
       <a href="/app">Go deeper in the app <ArrowRight aria-hidden="true" /></a>
-      <a href={MEMETIC_TOKEN_EXPLORER_URL} target="_blank" rel="noreferrer" title={MEMETIC_TOKEN_ADDRESS} className={styles.domain}>$MS · {MEMETIC_TOKEN_ADDRESS.slice(0, 6)}…{MEMETIC_TOKEN_ADDRESS.slice(-4)}</a>
+      <a href={MEMETIC_TOKEN_EXPLORER_URL} target="_blank" rel="noreferrer" title={MEMETIC_TOKEN_ADDRESS} className={styles.domain}>$MS · View contract</a>
     </footer>
   </main>;
 }

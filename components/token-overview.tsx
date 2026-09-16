@@ -3,6 +3,7 @@
 import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 
 import { useEffect, useState } from "react";
+import { CopyContract } from "./token-identity";
 import { TokenAvatar } from "./token-avatar";
 import { tokenTitle, tokenSubtitle, type TokenSearchResult } from "@/lib/tokens/model";
 import { usd } from "@/lib/tokens/radar";
@@ -25,7 +26,7 @@ export function TokenOverview({ address, indexed, onIdentity }: {
   const identity = token ?? { tokenAddress: address, name: null, symbol: null };
   return <section className="rounded-lg border border-foreground/15 p-4 text-sm leading-6" aria-label="Token overview">
     <div className="flex items-center gap-3"><TokenAvatar token={identity} className="grid size-12 shrink-0 place-items-center overflow-hidden rounded bg-signal/20 font-semibold" /><div className="min-w-0"><h3 className="break-words text-xl font-bold">{tokenTitle(identity)}</h3><p className="text-muted-foreground">{tokenSubtitle(identity)}</p></div></div>
-    <p className="mt-3 break-all font-mono text-xs">{address}</p>
+    <CopyContract address={address} className="mt-3" />
     {token?.source === "pons" ? <><dl className="my-4 grid grid-cols-2 gap-3"><div><dt className="text-muted-foreground">Market cap · PONS</dt><dd className="text-lg font-semibold">{usd(token.marketCapUsd)}</dd></div><div><dt className="text-muted-foreground">24h volume · PONS</dt><dd className="text-lg font-semibold">{usd(token.volume24hUsd)}</dd></div></dl>
       {token.latestBuyAt ? <p>Latest buy reported by PONS: {new Date(token.latestBuyAt).toUTCString()}</p> : null}
       {token.sourceFetchedAt ? <p className="mt-1 text-xs text-muted-foreground">Snapshot retrieved: {new Date(token.sourceFetchedAt).toUTCString()}{token.sourceStale ? " · refresh unavailable" : ""}</p> : null}
