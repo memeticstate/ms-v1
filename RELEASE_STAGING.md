@@ -1,3 +1,22 @@
+# v64.1 deployment follow-up — token artwork
+
+The full v64 redesign was merged in PR #4 (`73d97800aa5df1f2ef3fcfebb264221925c1bb45`).
+This follow-up loads missing artwork by exact contract via the existing lookup API,
+including Saved, CHANGED and factory arrivals. Visible avatars request metadata
+with a shared cache, deduplication, a three-request concurrency limit, bounded queue
+and timeout. Artwork never changes token evidence, names, metrics or classification.
+The existing allowlisted image proxy is preserved; unavailable images retain initials.
+
+Deployment remains staging-only. The owner must deploy the compiled v64.1 package
+through their authenticated Wrangler session. No production or DNS cutover is included.
+
+Infrastructure audit: 138 protected backend, authentication, configuration and dependency
+files are byte-identical to the v63 source. Tests cover recovery, wrong-contract and
+unsafe metadata, deduplication/concurrency, retry caching, and valid image proxy bytes.
+Live visual/authentication checks remain pending deployment.
+
+---
+
 # Memetic State v64 — unified product design
 
 Base: `infra/cloudflare-staging-v62` at `da281c6f09baf9021f06a538bf9d2ff938bf9271`.
