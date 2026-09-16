@@ -2,6 +2,7 @@
 import { quoteAssetLabel } from "@/lib/pons/quote-label";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Radio, RefreshCw } from "lucide-react";
+import { TokenAvatar } from "@/components/token-avatar";
 import { Button } from "@/components/ui/button";
 import { factoryFeedFresh } from "@/lib/pons/factory-feed";
 import type { PonsStateResponse, PonsTapeEvent } from "@/lib/pons/model";
@@ -44,7 +45,7 @@ export function FactoryActivity({ state, stream, onInspect, expanded = false }: 
     </div>
     {events.length ? <div className="grid sm:grid-cols-2 xl:grid-cols-3">{events.map((event) => <button type="button" key={event.id} onClick={() => onInspect(event)} className={`group min-w-0 border-b border-r border-foreground/[0.07] px-4 py-3.5 text-left transition hover:bg-foreground/[0.035] focus-visible:outline-2 focus-visible:outline-signal sm:px-5 ${stream.newIds.includes(event.id) ? "factory-event-new" : ""}`}>
       <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.08em]" style={{ color: colors[event.eventType] }}><span className="size-1 rounded-full bg-current" />{labels[event.eventType]}{stream.newIds.includes(event.id) ? <strong className="ml-1 text-[8px]">NEW</strong> : null}</span><span className="font-mono text-[9px] text-muted-foreground">{age(event.observedAt, now)}</span></div>
-      <div className="mt-2 flex items-baseline gap-2"><strong className="truncate text-base font-semibold text-foreground/90">{event.tokenSymbol === "—" ? `${event.tokenAddress.slice(0, 6)}…${event.tokenAddress.slice(-4)}` : event.tokenSymbol}</strong><span className="text-[10px] text-muted-foreground">{event.pairSymbol !== "—" ? `/ ${quoteAssetLabel(event.pairSymbol)}` : ""}</span><ArrowUpRight className="ml-auto size-3.5 shrink-0 text-muted-foreground transition group-hover:text-signal" /></div>
+      <div className="mt-2 flex items-center gap-2"><TokenAvatar token={{ tokenAddress: event.tokenAddress, symbol: event.tokenSymbol, name: null }} className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl border border-foreground/10 bg-[var(--surface-3)] text-xs font-semibold" /><strong className="truncate text-base font-semibold text-foreground/90">{event.tokenSymbol === "—" ? `${event.tokenAddress.slice(0, 6)}…${event.tokenAddress.slice(-4)}` : event.tokenSymbol}</strong><span className="text-[10px] text-muted-foreground">{event.pairSymbol !== "—" ? `/ ${quoteAssetLabel(event.pairSymbol)}` : ""}</span><ArrowUpRight className="ml-auto size-3.5 shrink-0 text-muted-foreground transition group-hover:text-signal" /></div>
       <p className="mt-1.5 font-mono text-[9px] tracking-[0.04em] text-muted-foreground/80">BLOCK #{integer.format(event.blockNumber)}<span className="mx-2 text-foreground/20">/</span>Inspect evidence</p>
     </button>)}</div> : <p className="p-5 text-xs text-muted-foreground">{feed?.indexedBlock ? "No matching events in the retained feed. New confirmed events appear automatically." : "Waiting for a successful factory collection. Confirmed events will appear here automatically."}</p>}
     <div className="flex flex-wrap justify-between gap-2 px-4 py-2.5 font-mono text-[9px] text-muted-foreground sm:px-5">
