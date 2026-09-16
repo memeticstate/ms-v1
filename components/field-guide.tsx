@@ -56,7 +56,7 @@ export function GuideTour({ onStart }: { onStart: () => void }) {
     <Dialog open={step !== null} onOpenChange={(open) => { if (!open) setStep(null); }}>
       <DialogContent className="guide-dialog border-attention/30 bg-[var(--surface-popover)] sm:max-w-xl">
         {step === -1 ? <>
-          <div className="flex items-center gap-4"><StateGlyph className="size-16 shrink-0" /><div><p className="text-2xl font-bold tracking-tight">MEMETIC <em className="specimen-serif font-normal text-culture">State</em></p><p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">A field guide to attention</p></div></div>
+          <div className="flex items-center gap-4"><StateGlyph className="size-16 shrink-0" /><div><p className="text-2xl font-bold tracking-tight">MEMETIC <em className="specimen-serif font-normal text-culture">State</em></p><p className="mt-1 font-medium text-xs tracking-normal text-muted-foreground">A field guide to attention</p></div></div>
           <DialogTitle className="mt-2 text-2xl">Welcome to the field.</DialogTitle>
           <DialogDescription className="text-base leading-7">Memetic State is non-traditional, experimental software for independent attention intelligence on Robinhood Chain. Explore what changed, inspect the evidence, and form your own reading.</DialogDescription>
           <div className="min-w-0 rounded-lg border border-attention/20 bg-attention/5 p-4">

@@ -4,7 +4,7 @@ import { robinhoodExplorer } from "@/lib/robinhood-explorer";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, ArrowRight, RefreshCw } from "lucide-react";
-import { StateGlyph } from "@/components/state-glyph";
+import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { TokenAvatar } from "@/components/token-avatar";
 import { TokenSearch } from "@/components/token-search";
@@ -147,16 +147,7 @@ export function MemeticLanding() {
 
   return <main className={styles.landing}>
     <a className={styles.skipLink} href="#radar">Skip to signals</a>
-    <header className={styles.header}>
-      <a href="/" className={styles.brand} aria-label="Memetic State home">
-        <StateGlyph className={styles.brandMark} /><span>MEMETIC <em>State</em></span>
-      </a>
-      <nav aria-label="Main navigation" className={styles.nav}>
-        <a href="#radar">Explore</a><a href="/docs/field-guide/">Field guide</a><a href="/docs/">Docs</a>
-      </nav>
-      <a href={MEMETIC_TOKEN_EXPLORER_URL} target="_blank" rel="noreferrer" title={MEMETIC_TOKEN_ADDRESS} className={styles.tokenContract} aria-label={`MS token contract ${MEMETIC_TOKEN_ADDRESS}`}>$MS · {MEMETIC_TOKEN_ADDRESS.slice(0, 6)}…{MEMETIC_TOKEN_ADDRESS.slice(-4)}</a>
-      <Button asChild className={styles.openButton}><a href="/app">Open app <ArrowUpRight aria-hidden="true" /></a></Button>
-    </header>
+    <AppHeader active="home" />
 
     <section className={styles.hero} aria-labelledby="landing-title">
       <div>
@@ -166,7 +157,7 @@ export function MemeticLanding() {
       <div className={styles.heroIntro}>
         <p>Track new tokens, spot changing activity, and inspect the evidence on Robinhood Chain.</p>
         <div className={styles.heroActions}>
-          <Button asChild className={styles.openButton}><a href="#radar">Explore the signals <ArrowUpRight aria-hidden="true" /></a></Button>
+          <Button asChild className={styles.openButton}><a href="/app">Open app <ArrowUpRight aria-hidden="true" /></a></Button>
           <button type="button" onClick={showReading} className={styles.textLink}>How to read a signal</button>
         </div>
         <p className={styles.heroNote}>Public evidence. No wallet needed to explore.</p>
@@ -235,7 +226,7 @@ export function MemeticLanding() {
     <footer className={styles.footer}>
       <p>Attention moves. <em>Keep the evidence.</em></p>
       <a href="/app">Go deeper in the app <ArrowRight aria-hidden="true" /></a>
-      <a href="/" className={styles.domain}>memeticstate.com</a>
+      <a href={MEMETIC_TOKEN_EXPLORER_URL} target="_blank" rel="noreferrer" title={MEMETIC_TOKEN_ADDRESS} className={styles.domain}>$MS · {MEMETIC_TOKEN_ADDRESS.slice(0, 6)}…{MEMETIC_TOKEN_ADDRESS.slice(-4)}</a>
     </footer>
   </main>;
 }

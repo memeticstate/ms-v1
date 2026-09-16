@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 import type { ResearchDossier } from "@/lib/premium/research";
 
 const box = "rounded-lg border border-foreground/12 bg-[var(--surface-1)] p-5 sm:p-6";
-const label = "font-mono text-sm uppercase tracking-[0.1em] text-attention";
+const label = "font-medium text-sm tracking-normal text-attention";
 const time = (value: string | null) => value ? new Date(value).toLocaleString() : "Not recorded";
 
 export function PremiumWorkflowPanels({ data }: { data: ResearchDossier }) {
