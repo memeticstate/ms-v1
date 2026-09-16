@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { TokenAvatar } from "./token-avatar";
-import { shortTokenAddress, tokenAddress, tokenSubtitle, tokenTitle, type TokenSearchResponse, type TokenSearchResult } from "@/lib/tokens/model";
+import { tokenAddress, tokenSubtitle, tokenTitle, type TokenSearchResponse, type TokenSearchResult } from "@/lib/tokens/model";
 import styles from "./token-search.module.css";
 
 export function TokenSearch({ onSelect, className = "", appearance = "app" }: {
@@ -56,12 +56,12 @@ export function TokenSearch({ onSelect, className = "", appearance = "app" }: {
         <div className={styles.searchStatus} role="status">{loading ? "Searching tokens…" : error ? "Search couldn’t connect. Try again." : response?.partial ? "Some sources are unavailable. Available matches are shown." : `${results.length} matches · Robinhood Chain`}</div>
         {results.map(token => <CommandItem key={token.tokenAddress} value={token.tokenAddress} onSelect={() => choose(token)} className={styles.result}>
           <TokenAvatar token={token} className={styles.avatar} />
-          <span className={styles.identity}><strong>{tokenTitle(token)}</strong><span>{tokenSubtitle(token)}</span><code>{shortTokenAddress(token.tokenAddress)}</code></span>
+          <span className={styles.identity}><strong>{tokenTitle(token)}</strong><span>{tokenSubtitle(token)}</span></span>
           <span className={styles.source}>{token.indexed ? "Indexed" : token.source === "pons" ? "PONS" : "Contract"}</span>
         </CommandItem>)}
         {!loading && !error && !results.length ? <p className={styles.empty}>{response?.partial ? "No matches from the available sources. Retry or inspect a full contract address." : "No matching token was found. Try the full name or contract address."}</p> : null}
         {!loading && (error || response?.partial) ? <CommandItem value="retry-search" onSelect={() => { setLoading(true); setRetry(value => value + 1); }} className={styles.addressAction}>Retry search</CommandItem> : null}
-        {address && !results.some(token => token.tokenAddress === address) ? <CommandItem value={`inspect-${address}`} onSelect={() => choose({ tokenAddress: address, name: null, symbol: null, indexed: false, source: "contract" })} className={styles.addressAction}>Inspect {shortTokenAddress(address)}</CommandItem> : null}
+        {address && !results.some(token => token.tokenAddress === address) ? <CommandItem value={`inspect-${address}`} onSelect={() => choose({ tokenAddress: address, name: null, symbol: null, indexed: false, source: "contract" })} className={styles.addressAction}>Inspect this contract</CommandItem> : null}
       </CommandList> : null}
     </Command>
   </div>;

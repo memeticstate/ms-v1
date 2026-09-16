@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { TokenLabel, CopyContract } from "./token-identity";
 import { TokenAvatar } from "@/components/token-avatar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -110,10 +111,10 @@ export function WatchlistPanel({ entries, launches, onInspect, onRulesChange, on
                 <div className="watch-identity">
                   <TokenAvatar token={{ ...entry, imageUrl: launch?.imageUrl }} className="workspace-token-avatar" />
                   <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded border px-2 py-1 font-medium text-xs tracking-normal" style={{ color: entry.pairColor, borderColor: `color-mix(in srgb, ${entry.pairColor} 30%, transparent)`, backgroundColor: `color-mix(in srgb, ${entry.pairColor} 6%, transparent)` }}>{entry.pairSymbol} habitat</span>{unreadAlerts.length ? <span className="inline-flex items-center gap-1.5 rounded border border-signal/20 bg-signal/[0.035] px-2 py-1 font-medium text-xs tracking-normal text-signal"><i className="size-1 rounded-full bg-current" />{unreadAlerts.length} new</span> : null}</div>
-                  <h3 className="mt-3 truncate text-lg font-semibold text-foreground/80"><a href={appTokenHref("brief", entry.tokenAddress)} className="hover:underline">{entry.symbol && entry.symbol !== "—" ? entry.symbol : entry.name}</a></h3>
-                  <p className="mt-1 font-medium text-xs tracking-normal text-muted-foreground">{entry.symbol} · saved {relativeTime(entry.savedAt)}</p></div>
+                  <h3 className="mt-3 truncate text-lg font-semibold text-foreground/80"><a href={appTokenHref("brief", entry.tokenAddress)} className="hover:underline"><TokenLabel token={launch ?? entry} /></a></h3>
+                  <p className="mt-1 font-medium text-xs tracking-normal text-muted-foreground">Saved {relativeTime(entry.savedAt)}</p></div>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5"><CopyContract address={entry.tokenAddress} />
                   {launch ? <Button type="button" variant="outline" size="icon-sm" onClick={() => onInspect(launch)} aria-label={`Inspect ${entry.name}`} title="Open dossier" className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:text-signal"><Eye /></Button> : null}
                   <Button type="button" variant="outline" size="icon-sm" onClick={() => onRemove(entry.tokenAddress)} aria-label={`Remove ${entry.name} from watchlist`} title="Remove watch" className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:border-culture/30 hover:text-culture"><Trash2 /></Button>
                 </div>

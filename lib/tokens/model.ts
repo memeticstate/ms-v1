@@ -44,14 +44,20 @@ export function tokenAddress(value: string): string | null {
 
 export function shortTokenAddress(value: string) { return `${value.slice(0, 6)}…${value.slice(-6)}`; }
 
+export function tokenIdentityText(value: unknown, max = 96) {
+  const text = tokenText(value, max);
+  return text && !/^\$?0x[0-9a-f]{4,}(?:[.…]+[0-9a-f]+)?$/i.test(text) ? text : null;
+}
+
 export function tokenTitle(token: TokenIdentity) {
-  const symbol = tokenText(token.symbol, 32);
-  return symbol && !symbol.startsWith("0x") ? `$${symbol.replace(/^\$/, "")}`
-    : tokenText(token.name) ?? shortTokenAddress(token.tokenAddress);
+  const symbol = tokenIdentityText(token.symbol, 32);
+  return symbol ? `$${symbol.replace(/^\$/, "")}` : tokenIdentityText(token.name) ?? "Token identity pending";
 }
 
 export function tokenSubtitle(token: TokenIdentity) {
-  return tokenText(token.name) ?? shortTokenAddress(token.tokenAddress);
+  const name = tokenIdentityText(token.name);
+  const symbol = tokenIdentityText(token.symbol);
+  return name && symbol && name !== symbol ? name : "";
 }
 
 export function safeTokenImage(value: unknown): string | null {

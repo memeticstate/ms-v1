@@ -72,3 +72,46 @@ test('the existing image proxy preserves valid artwork bytes and browser caching
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
   } finally { globalThis.fetch = original; }
 });
+
+test('labels and artwork recover one exact-contract identity with bounded shared work', async () => {
+  const { createTokenIdentityResolver } = await vite.ssrLoadModule('/lib/tokens/icon-client.ts');
+  let calls = 0;
+  const resolve = createTokenIdentityResolver(async () => {
+    calls++;
+    return Response.json({ token: { tokenAddress: address(1), name: 'Recovered\u202e token', symbol: 'REAL', imageUrl: icon } });
+  });
+  const label = resolve(address(1)), avatar = resolve(address(1));
+  assert.equal(label, avatar);
+  assert.deepEqual(await label, { tokenAddress: address(1), name: 'Recovered token', symbol: 'REAL', imageUrl: icon });
+  assert.equal((await resolve(address(1))).symbol, 'REAL');
+  assert.equal(calls, 1);
+  assert.equal(await resolve(address(2)), null, 'wrong-contract identity must never label another token');
+});
+
+test('token labels prefer ticker, show names once, and never use an address as a fallback', async () => {
+  const { TokenLabel, CopyContract } = await vite.ssrLoadModule('/components/token-identity.tsx');
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup: render } = await import('react-dom/server');
+  const markup = token => render(createElement(TokenLabel, { token: { tokenAddress: address(1), ...token } }));
+  const named = markup({ name: 'Example token', symbol: 'EX' });
+  assert.match(named, /\$EX/); assert.match(named, /Example token/); assert.ok(named.indexOf('$EX') < named.indexOf('Example token'));
+  assert.equal((markup({ name: 'Name only', symbol: null }).match(/Name only/g) ?? []).length, 1);
+  for (const value of [null, '—', address(1), '0xc860…9595']) {
+    const pending = markup({ name: value, symbol: value });
+    assert.match(pending, /Token identity pending/); assert.doesNotMatch(pending, /0x/);
+  }
+  const copy = render(createElement(CopyContract, { address: address(1) }));
+  assert.match(copy, /Copy contract address/); assert.doesNotMatch(copy, /0x/);
+});
+
+test('every quote asset remains reachable in the filter controls', async () => {
+  const { CohortStrip } = await vite.ssrLoadModule('/components/cohort-strip.tsx');
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const cohorts = Array.from({ length: 39 }, (_, i) => ({ address: address(i + 1), symbol: `ASSET${i}`, attentionScore: i, color: '#fff', recentTrades: i, signal: 'steady' }));
+  const html = renderToStaticMarkup(createElement(CohortStrip, { cohorts, activePair: 'ALL', onPair() {} }));
+  assert.match(html, /39 quote assets observed in this window/);
+  assert.match(html, /Previous quote assets/); assert.match(html, /Next quote assets/); assert.match(html, /Show all assets/);
+  for (const cohort of cohorts) assert.ok(html.includes(`>${cohort.symbol}<`));
+  assert.equal((html.match(/aria-pressed=/g) ?? []).length, 40);
+});

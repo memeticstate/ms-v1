@@ -26,7 +26,7 @@ export function HeaderWallet({ passport, onAccount }: { passport: PassportRespon
         aria-label={`Copy Memetic State contract address ${MEMETIC_TOKEN_ADDRESS}`}
         className="flex h-full items-center gap-2 rounded-l px-2.5 transition hover:bg-attention/10 focus-visible:outline-2 focus-visible:outline-attention">
         <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-attention">CA</span>
-        <span className="font-mono text-[10px] text-foreground/80"><span className="2xl:hidden">{MEMETIC_TOKEN_ADDRESS.slice(0, 6)}…{MEMETIC_TOKEN_ADDRESS.slice(-4)}</span><span className="hidden 2xl:inline">{MEMETIC_TOKEN_ADDRESS}</span></span>
+        <span className="text-xs">Copy CA</span>
         {copyState === "copied" ? <Check className="size-3 text-signal" /> : <Copy className="size-3 text-attention" />}
       </button>
       <a href={MEMETIC_TOKEN_EXPLORER_URL} target="_blank" rel="noreferrer" aria-label="View Memetic State token contract on block explorer" title="View token contract"

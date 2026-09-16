@@ -5,6 +5,7 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, Clock3, Compass, Grid2X2, History, List, Plus, RefreshCw } from 'lucide-react';
 import { AppHeader } from './app-header';
+import { TokenLabel, CopyContract } from './token-identity';
 import { TokenAvatar } from './token-avatar';
 import { TokenSearch } from './token-search';
 import { useSimpleState } from './use-simple-state';
@@ -12,7 +13,7 @@ import { currentPonsEvidence } from '@/lib/pons/research';
 import { factoryFeedFresh } from '@/lib/pons/factory-feed';
 import { nowLaunches, relativeTime, stateTone, tradeChange, transitionCopy } from '@/lib/pons/simple';
 import type { PonsActivitySignal, PonsLaunchView, PonsTokenStateTransition } from '@/lib/pons/model';
-import { shortTokenAddress, tokenText } from '@/lib/tokens/model';
+import { tokenTitle, tokenText } from '@/lib/tokens/model';
 import { legacyAppDestination } from '@/lib/app-navigation';
 import styles from './simple-experience.module.css';
 
@@ -29,17 +30,17 @@ export function FeedRow({ token, launch, transition, time, isNew = false, histor
   launch?: PonsLaunchView; transition?: PonsTokenStateTransition | null; time?: string; isNew?: boolean; historical?: boolean;
 }) {
   const signal = launch?.signal ?? (transition ? transition.to : 'unverified');
-  const title = tokenText(token.symbol, 40) ?? tokenText(token.name) ?? shortTokenAddress(token.tokenAddress);
+  const title = tokenTitle(token);
   const pair = token.pairSymbol === 'WETH' ? 'ETH' : token.pairSymbol;
   const observation = isNew ? launch ? 'Current reading · ' + signal.toUpperCase() : 'Participation not yet assessed'
     : transition ? transitionCopy(transition) : historical ? 'Recorded observation' : launch?.research?.label ?? 'Evidence needs attention';
-  return <Link href={'/app/token/' + token.tokenAddress} className={styles.feedRow} data-historical={historical} data-tone={stateTone(signal)}>
+  return <article style={{ position: "relative" }} className={styles.feedRow} data-historical={historical} data-tone={stateTone(signal)}>
+    <Link href={'/app/token/' + token.tokenAddress} aria-label={`Open ${title} brief`} className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-2 focus-visible:outline-signal" />
     <div className={styles.cardIdentity}>
       <TokenAvatar token={token} className={styles.tokenAvatar} tone={stateTone(signal)} />
       <div className={styles.rowIdentity}>
-        <strong>{title.replace(/^\$/, '')}</strong>
-        <span>{tokenText(token.name) ?? 'Identity resolving'}</span>
-        <div className={styles.tokenMeta}><span>{pair || 'Pair resolving'}</span><span>{shortTokenAddress(token.tokenAddress)}</span></div>
+        <TokenLabel token={token} />
+        <div className={styles.tokenMeta}><span>{pair || 'Pair resolving'}</span><CopyContract address={token.tokenAddress} /></div>
       </div>
       <span className={styles.cardOpen} aria-hidden="true"><ArrowUpRight size={17} /></span>
     </div>
@@ -54,7 +55,7 @@ export function FeedRow({ token, launch, transition, time, isNew = false, histor
     </div> : <p className={styles.rowEvidence}>{isNew ? 'Participation not yet assessed' : 'Open brief for current evidence'}</p>}
     <p className={styles.rowTransition}>{observation}</p>
     <div className={styles.cardFooter}><span className={styles.rowTime}><Clock3 size={12} />{historical ? 'Recorded · ' : ''}{time}</span><span className={styles.briefLink}>Open brief <ArrowRight size={13} /></span></div>
-  </Link>;
+  </article>;
 }
 
 const views = [
@@ -119,7 +120,7 @@ export function SimpleExperience() {
         <div className={styles.feedGrid} data-layout={layout} data-view={view}>
           {!loading && view === 'now' && fresh ? relevant.map(launch => { const matchingTransition = launch.stateTransition?.to === launch.signal ? launch.stateTransition : null; return <FeedRow key={launch.tokenAddress} token={launch} launch={launch} transition={matchingTransition} time={relativeTime(matchingTransition?.observedAt ?? state?.generatedAt, now)} />; }) : null}
           {!loading && view === 'changed' ? changes.map(record => <FeedRow key={record.tokenAddress} token={{ ...record, imageUrl: launchesByAddress.get(record.tokenAddress.toLowerCase())?.imageUrl ?? null }} transition={record.transition} time={relativeTime(record.transition.observedAt, now)} historical />) : null}
-          {!loading && view === 'new' ? events.map(event => { const launch = launchesByAddress.get(event.tokenAddress.toLowerCase()); const assessed = fresh && state && state.index.latestIndexedBlock >= event.blockNumber ? launch : undefined; return <FeedRow key={event.id} token={launch ?? { tokenAddress: event.tokenAddress, name: '', symbol: event.tokenSymbol, pairSymbol: event.pairSymbol }} launch={assessed} time={relativeTime(event.observedAt, now)} isNew />; }) : null}
+          {!loading && view === 'new' ? events.map(event => { const launch = launchesByAddress.get(event.tokenAddress.toLowerCase()); const assessed = fresh && state && state.index.latestIndexedBlock >= event.blockNumber ? launch : undefined; return <FeedRow key={event.id} token={launch ?? { tokenAddress: event.tokenAddress, name: event.tokenName ?? '', symbol: event.tokenSymbol, pairSymbol: event.pairSymbol }} launch={assessed} time={relativeTime(event.observedAt, now)} isNew />; }) : null}
         </div>
         {!loading && !count && !viewError && (view !== 'now' || fresh) ? <div className={styles.empty}><Compass size={30} strokeWidth={1.2} /><h2>{view === 'changed' ? 'No changes in this observation.' : view === 'new' ? 'No launches in the current window.' : 'The field is quiet.'}</h2><p>{view === 'now' ? 'No observed token currently meets the attention criteria. Explore the full evidence or return after the next observation.' : 'New evidence will appear as the collector records it.'}</p><Link href="/app/observe">Explore the Observatory <ArrowRight size={16} /></Link></div> : null}
       </section>

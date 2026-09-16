@@ -146,3 +146,34 @@ test("reorg and wrong-chain responses are rejected; a failed refresh preserves d
     assert.equal(sqlite.prepare("SELECT locked_until FROM pons_recent_curve_checks WHERE token_address = ?").get(token).locked_until, 0);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('new quote assets are indexed before registry discovery and reconciled without changing evidence', async () => {
+  const { reconcilePonsQuoteAssets } = await vite.ssrLoadModule('/db/pons-quotes.ts');
+  const quote = address(0xabcdef), newToken = address(800), newCurve = address(801);
+  const launch = { ...log(800), address: PONS_V2_FACTORY, topics: [PONS_TOPICS.launch, hash(800), hash(801), hash(802)], data: `0x${[quote, 1, rawAmount].map(word).join('')}` };
+  await persistPonsLogs({ factoryLogs: [launch], curveLogs: [log(801, 'buy', { address: newCurve })], fallbackTimestamp: 1_700_000_000 });
+  const read = () => sqlite.prepare('SELECT * FROM pons_launches WHERE token_address = ?').get(newToken);
+  assert.equal(read().pair_token_address, quote);
+  assert.match(read().pair_symbol, /^PAIR-/);
+  const trades = sqlite.prepare('SELECT * FROM pons_curve_trades').all();
+  const events = sqlite.prepare('SELECT * FROM pons_events').all();
+  const progress = sqlite.prepare('SELECT * FROM pons_index_state').all();
+  const before = read();
+  sqlite.prepare(`INSERT INTO robinhood_assets (asset_uid, token_symbol, token_name, status, contract_address, chain_id, token_decimals, content_hash, observed_at, updated_at)
+    VALUES ('new-quote', 'FRESH', 'New quote', 'ASSET_STATUS_ACTIVE', ?, 4663, 6, 'hash', 1, 1)`).run(quote);
+  await reconcilePonsQuoteAssets();
+  assert.deepEqual({ ...read() }, { ...before, pair_symbol: 'FRESH', pair_decimals: 6 });
+  assert.deepEqual(sqlite.prepare('SELECT * FROM pons_curve_trades').all(), trades);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM pons_events').all(), events);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM pons_index_state').all(), progress);
+  await reconcilePonsQuoteAssets();
+  assert.deepEqual({ ...read() }, { ...before, pair_symbol: 'FRESH', pair_decimals: 6 }, 'reconciliation is idempotent');
+  for (const update of ["status = 'ASSET_STATUS_REMOVED', token_symbol = 'REMOVED'", "status = 'ASSET_STATUS_ACTIVE', chain_id = 1, token_symbol = 'WRONGCHAIN'"]) {
+    sqlite.exec(`UPDATE robinhood_assets SET ${update} WHERE asset_uid = 'new-quote'`);
+    await reconcilePonsQuoteAssets();
+    assert.equal(read().pair_symbol, 'FRESH');
+  }
+  sqlite.exec("UPDATE robinhood_assets SET chain_id = 4663, token_symbol = 'RENAMED', token_decimals = 99 WHERE asset_uid = 'new-quote'");
+  await reconcilePonsQuoteAssets();
+  assert.equal(read().pair_symbol, 'RENAMED'); assert.equal(read().pair_decimals, 6);
+});

@@ -60,8 +60,8 @@ test("search ranks exact ticker matches first, deduplicates contracts, and never
   assert.deepEqual(rankTokenMatches([market], address(8)), []);
 });
 
-test("missing identities retain distinguishable CAs and unsafe metadata cannot become an image request", () => {
-  assert.equal(tokenTitle({ tokenAddress: address(1), name: "Name unresolved", symbol: "—" }), "0x0000…000001");
+test("missing identities stay pending without displaying CAs and unsafe metadata cannot become an image request", () => {
+  assert.equal(tokenTitle({ tokenAddress: address(1), name: "Name unresolved", symbol: "—" }), "Token identity pending");
   assert.equal(tokenTitle({ tokenAddress: address(1), name: "Actual name", symbol: "—" }), "Actual name");
   assert.equal(tokenAddress("javascript:alert(1)"), null);
   assert.equal(safeTokenImage("https://127.0.0.1/image.png"), null);
@@ -197,7 +197,19 @@ test("the factory feed resolves identities in one SQLite read without moving arc
   const feed = await loadFactoryFeed();
   assert.equal(feed.events.length, 150);
   assert.equal(feed.events[0].tokenSymbol, "NEEDLE");
+  assert.equal(feed.events[0].tokenName, "Needle Token");
   assert.equal(feed.events[149].tokenSymbol, "EX150");
   assert.equal(feed.events[0].pairSymbol, "ETH");
   assert.deepEqual(sqlite.prepare("SELECT * FROM pons_index_state").all(), before);
+});
+
+test("registry reconciliation also maps older-generation quotes without changing launch identity", async () => {
+  const { reconcilePonsQuoteAssets } = await vite.ssrLoadModule('/db/pons-quotes.ts');
+  sqlite.prepare('UPDATE pons_v1_launches SET pair_token_address = ?, pair_symbol = ? WHERE token_address = ?').run(address(940), 'PAIR-0000', address(900));
+  const read = () => ({ ...sqlite.prepare('SELECT * FROM pons_v1_launches WHERE token_address = ?').get(address(900)) });
+  const before = read();
+  sqlite.prepare(`INSERT INTO robinhood_assets (asset_uid, token_symbol, token_name, status, contract_address, chain_id, token_decimals, content_hash, observed_at, updated_at)
+    VALUES ('legacy-quote', 'NEWQUOTE', 'New quote', 'ASSET_STATUS_ACTIVE', ?, 4663, NULL, 'hash', 1, 1)`).run(address(940));
+  await reconcilePonsQuoteAssets();
+  assert.deepEqual(read(), { ...before, pair_symbol: 'NEWQUOTE' });
 });

@@ -137,6 +137,7 @@ export type PonsTapeEvent = {
   eventType: "launch" | "graduation" | "sweep" | "permanent-lock";
   tokenAddress: string;
   tokenSymbol: string;
+  tokenName?: string | null;
   pairSymbol: string;
   blockNumber: number;
   observedAt: string;

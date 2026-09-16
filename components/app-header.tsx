@@ -38,7 +38,7 @@ function ProjectBanner() {
   return <aside className={styles.projectBanner} aria-label="Memetic State token and community">
     <div className={styles.contractIdentity}>
       <span className={styles.tokenLabel}>$MS <span>CA</span></span>
-      <code className={styles.contractAddress}>{MS_CONTRACT}</code>
+
       <button type="button" className={styles.copyButton} onClick={() => void copyContract()} aria-label={copyState === 'copied' ? 'Contract address copied' : 'Copy MS contract address'} title="Copy contract address">
         {copyState === 'copied' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
       </button>

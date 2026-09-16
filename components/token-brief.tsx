@@ -15,7 +15,7 @@ import { currentPonsEvidence, evidenceIsFresh } from '@/lib/pons/research';
 import { meaningfulHolderCount, quoteFlowDirection, relativeTime, stateTone, tradeChange, transitionCopy, type TokenHistoryRecord } from '@/lib/pons/simple';
 import { selectedLaunch } from '@/lib/pons/navigation';
 import { createWatchEntry, parseWatchlist, WATCHLIST_STORAGE_KEY } from '@/lib/pons/watchlist';
-import { tokenAddress, shortTokenAddress, tokenText } from '@/lib/tokens/model';
+import { tokenAddress, tokenTitle, shortTokenAddress, tokenText } from '@/lib/tokens/model';
 import { robinhoodExplorer } from '@/lib/robinhood-explorer';
 import type { PonsActivitySignal, PonsLaunchView } from '@/lib/pons/model';
 import styles from './token-brief.module.css';
@@ -158,7 +158,7 @@ function BriefContent({ address }: { address: string }) {
   const holderCount = meaningfulHolderCount(launch, now);
   const flowPresent = launch.netQuoteFlow !== null && launch.netQuoteFlow !== undefined;
   const comparisonPresent = launch.previousTrades > 0;
-  const title = tokenText(launch.symbol, 40) ?? tokenText(launch.name) ?? shortTokenAddress(address);
+  const title = tokenTitle(launch);
   const habitat = launch.pairSymbol === 'WETH' ? 'ETH' : launch.pairSymbol;
   const currentSignal = launch.research?.signal ?? launch.signal;
   const coverage = [
@@ -175,7 +175,7 @@ function BriefContent({ address }: { address: string }) {
       <div className={styles.heroMain}>
         <div className={styles.identity}>
           <TokenAvatar token={launch} className={styles.avatar} />
-          <div className={styles.identityText}><div className={styles.identityTitle}><h1>{title.replace(/^\$/, '')}</h1><span className={styles.habitat}>{habitat}</span></div><p>{tokenText(launch.name) ?? 'Identity resolving'}</p><div className={styles.contractTools}><button onClick={() => void copy()} aria-label={copied ? 'Contract address copied' : 'Copy token contract'}><span>{shortTokenAddress(address)}</span>{copied ? <Check size={12} /> : <Copy size={12} />}</button><a href={robinhoodExplorer.token(address)} target="_blank" rel="noreferrer" aria-label="View token on Robinhood Etherscan"><ExternalLink size={13} /></a></div></div>
+          <div className={styles.identityText}><div className={styles.identityTitle}><h1>{title.replace(/^\$/, '')}</h1><span className={styles.habitat}>{habitat}</span></div><p>{tokenText(launch.name) ?? 'Identity resolving'}</p><div className={styles.contractTools}><button onClick={() => void copy()} aria-label={copied ? 'Contract address copied' : 'Copy token contract'}><span>{'Copy CA'}</span>{copied ? <Check size={12} /> : <Copy size={12} />}</button><a href={robinhoodExplorer.token(address)} target="_blank" rel="noreferrer" aria-label="View token on Robinhood Etherscan"><ExternalLink size={13} /></a></div></div>
         </div>
         <div className={styles.currentReading}><div className={styles.readingTopline}><span>Current reading</span><StateBadge signal={currentSignal} historical={!fresh} /></div><h2>{launch.research?.label ?? 'Current participation is unverified.'}</h2><p>{fresh ? 'From the latest available evidence.' : 'Last recorded observations. Current participation is not confirmed.'}</p></div>
       </div>

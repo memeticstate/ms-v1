@@ -1,3 +1,4 @@
+import { reconcilePonsQuoteAssets } from "@/db/pons-quotes";
 import { z } from "zod";
 
 import { getD1 } from "@/db";
@@ -233,6 +234,7 @@ async function persistAssets(rawAssets: z.infer<typeof assetSchema>[], observedA
     WHERE chain_id = ? AND observed_at < ?`)
     .bind(observedAt, observedAt, ROBINHOOD_CHAIN_ID, observedAt)
     .run();
+  await reconcilePonsQuoteAssets();
   return records.length;
 }
 
