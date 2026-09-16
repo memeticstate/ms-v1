@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { ArrowUpRight, Bookmark, ChevronDown, Compass, LogOut, MessageSquare, Moon, Plus, Radio, ShieldCheck, Sun, Wallet } from 'lucide-react';
+import { ArrowUpRight, Bookmark, Check, ChevronDown, Compass, Copy, LogOut, MessageSquare, Moon, Plus, Radio, ShieldCheck, Sun, Wallet } from 'lucide-react';
 import { StateGlyph } from './state-glyph';
 import { useMemeticAuth } from './memetic-auth-provider';
 import type { PassportResponse } from '@/lib/entitlements/client';
@@ -15,6 +15,41 @@ const destinations = [
   { id: 'research', title: 'Research', href: '/app/research', icon: MessageSquare },
   { id: 'saved', title: 'Saved', href: '/app/saved', icon: Bookmark },
 ] as const;
+
+const MS_CONTRACT = '0xedf1ac25ff0cf741a9ee1490c630e3a4ecfbd4fc';
+
+function ProjectBanner() {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  useEffect(() => {
+    if (copyState === 'idle') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 3000);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+
+  async function copyContract() {
+    try {
+      await navigator.clipboard.writeText(MS_CONTRACT);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  }
+
+  return <aside className={styles.projectBanner} aria-label="Memetic State token and community">
+    <div className={styles.contractIdentity}>
+      <span className={styles.tokenLabel}>$MS <span>CA</span></span>
+      <code className={styles.contractAddress}>{MS_CONTRACT}</code>
+      <button type="button" className={styles.copyButton} onClick={() => void copyContract()} aria-label={copyState === 'copied' ? 'Contract address copied' : 'Copy MS contract address'} title="Copy contract address">
+        {copyState === 'copied' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+      </button>
+    </div>
+    <a className={styles.socialButton} href="https://x.com/memeticstate" target="_blank" rel="noopener noreferrer" aria-label="Memetic State on X (opens in a new tab)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.64 7.584H.47l8.6-9.835L0 1.154h7.594l5.243 6.932 6.064-6.933Zm-1.29 19.49h2.039L6.487 3.24H4.3l13.31 17.403Z" /></svg>
+      <span>@memeticstate</span><ArrowUpRight size={13} aria-hidden="true" />
+    </a>
+    <span className={copyState === 'failed' ? styles.copyError : styles.srOnly} role="status">{copyState === 'copied' ? 'Contract address copied.' : copyState === 'failed' ? 'Copy unavailable. Select the address to copy it.' : ''}</span>
+  </aside>;
+}
 
 export function AppHeader({ active = 'now', passport = null, onAccount }: {
   active?: 'home' | 'now' | 'observe' | 'research' | 'saved'; passport?: PassportResponse | null; onAccount?: () => void;
@@ -64,6 +99,7 @@ export function AppHeader({ active = 'now', passport = null, onAccount }: {
         </div>
       </div>
     </header>
+    <ProjectBanner />
     <nav className={styles.mobileNav} aria-label="Mobile navigation">
       {destinations.map(item => <Link key={item.id} href={item.href} aria-current={active === item.id ? 'page' : undefined}><item.icon size={20} strokeWidth={1.8} aria-hidden="true" /><span>{item.title}</span></Link>)}
     </nav>
