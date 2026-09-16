@@ -1,0 +1,32 @@
+/* Shared visual foundation for every Memetic State surface. */
+:root {
+  color-scheme: dark;
+  --background: #0c0e10; --foreground: #f4f5f2;
+  --surface-depth: #090b0d; --surface-1: #121518; --surface-2: #191d21;
+  --surface-3: #21262b; --surface-popover: #1d2227;
+  --muted-foreground: #969fa8; --border: #ffffff12; --input: #ffffff24;
+  --signal: #bee68a; --attention: #e5bd6b; --danger: #ef998e;
+  --culture: #d2ae80; --slate: #a0abb5;
+  --card: var(--surface-1); --card-foreground: var(--foreground);
+  --popover: var(--surface-popover); --popover-foreground: var(--foreground);
+  --primary: var(--signal); --primary-foreground: #172016;
+  --secondary: var(--surface-3); --secondary-foreground: var(--foreground);
+  --muted: var(--surface-2); --accent: var(--surface-3); --accent-foreground: var(--foreground);
+  --destructive: var(--danger); --ring: var(--signal);
+  --chart-1: var(--signal); --chart-2: var(--culture); --chart-3: var(--attention);
+  --chart-4: var(--slate); --chart-5: var(--foreground);
+  --radius: .875rem;
+  --night-ink: var(--background); --field-paper: var(--foreground);
+  --lichen-green: var(--signal); --aged-brass: var(--attention);
+  --oxidized-clay: var(--culture); --river-slate: var(--slate);
+}
+.light {
+  color-scheme: light;
+  --background: #f6f7f5; --foreground: #1b211f;
+  --surface-depth: #e9eeea; --surface-1: #fff; --surface-2: #fff;
+  --surface-3: #e9eeea; --surface-popover: #fff;
+  --muted-foreground: #626b66; --border: #17291d16; --input: #17291d30;
+  --signal: #487525; --attention: #89621c; --danger: #a9433c;
+  --culture: #926338; --slate: #576d7c;
+  --primary-foreground: #fff;
+}

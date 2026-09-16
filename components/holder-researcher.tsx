@@ -19,7 +19,7 @@ import { RESEARCH_LIMITS, type ResearchTask, type ResearchRun, type ResearchRepo
 type Workspace = { assignments: ResearchTask[]; runs: ResearchRun[]; configured: boolean; usage: { used: number; limit: number } };
 const short = (ca: string) => `${ca.slice(0, 6)}…${ca.slice(-4)}`;
 const date = (value: number | string | null) => value ? new Date(value).toLocaleString(undefined, { timeZoneName: "short" }) : "Not recorded";
-const panel = "rounded-lg border border-foreground/12 bg-[var(--surface-1)] p-5 sm:p-6";
+const panel = "rounded-2xl border border-foreground/12 bg-[var(--surface-1)] p-5 sm:p-6";
 const focusLabels: Record<ResearchFocus, string> = { overview: "Overview", participation: "Participation", risk: "Evidence gaps", thesis: "Test a thesis" };
 const prompts: Record<ResearchFocus, string> = {
   overview: "What can we establish about this token, and what should I check next?",

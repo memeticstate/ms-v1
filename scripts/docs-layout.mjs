@@ -63,7 +63,8 @@ export async function refreshDocumentationLayout(output, chapters) {
 <title>${escape(title)} · Memetic State Docs</title>
 <meta name="description" content="Memetic State field guide, premium research access, token purpose, and creator fees.">
 <link rel="icon" type="image/svg+xml" href="/favicon-compass.svg?v=20260909">
-<link rel="stylesheet" href="/docs/styles.css?v=20260909-reading">
+<link rel="stylesheet" href="/docs/styles.css?v=20260916-v64">
+<script src="/docs/theme.js"></script>
 <link rel="canonical" href="https://docs.memeticstate.com${pagePath(slug)}">
 </head>
 <body data-doc-page="${slug || "welcome"}">

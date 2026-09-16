@@ -17,7 +17,7 @@ const destinations = [
 ] as const;
 
 export function AppHeader({ active = 'now', passport = null, onAccount }: {
-  active?: 'now' | 'observe' | 'research' | 'saved'; passport?: PassportResponse | null; onAccount?: () => void;
+  active?: 'home' | 'now' | 'observe' | 'research' | 'saved'; passport?: PassportResponse | null; onAccount?: () => void;
 }) {
   const { ready, authenticated, signIn, signOut, linkWallet, loginState } = useMemeticAuth();
   const { resolvedTheme, setTheme } = useTheme();
@@ -44,7 +44,7 @@ export function AppHeader({ active = 'now', passport = null, onAccount }: {
 
   return <>
     <header className={styles.header}>
-      <Link href="/app" className={styles.brand} aria-label="Memetic State home">
+      <Link href={active === 'home' ? '/' : '/app'} className={styles.brand} aria-label="Memetic State home">
         <span className={styles.brandSymbol}><StateGlyph className={styles.brandMark} /></span>
         <span className={styles.wordmark}>Memetic <span>State</span></span>
       </Link>

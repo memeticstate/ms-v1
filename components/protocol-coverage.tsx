@@ -25,7 +25,7 @@ export function ProtocolCoveragePanel({ state, onBrowse }: { state: PonsStateRes
     { id: "v1-legacy", label: "V1 legacy", mechanism: "Uniswap V3", factory: PONS_V1_LEGACY_FACTORY, startBlock: PONS_V1_LEGACY_START_BLOCK, status: "queued", dataDepth: "Registry", indexedThroughBlock: null, historicalProgress: 0, rankingEligible: false },
   ];
   const coverage = state.protocolCoverage;
-  return <section className="coverage-map mt-3 overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]">
+  return <section className="coverage-map mt-3 overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]">
     <div className="flex items-start justify-between gap-5 px-5 py-5 sm:px-6 sm:py-6">
       <div>
         <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.23em] text-attention"><GitBranch className="size-3.5" />Protocol coverage</p>

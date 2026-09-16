@@ -1,11 +1,11 @@
 .header,
 .mobileNav {
-  --nav-bg: #0c0e10;
-  --nav-surface: #15181b;
+  --nav-bg: var(--background);
+  --nav-surface: var(--surface-1);
   --nav-hover: #202428;
   --nav-active: #292e32;
-  --nav-text: #f1f2ee;
-  --nav-secondary: #8e959b;
+  --nav-text: var(--foreground);
+  --nav-secondary: var(--muted-foreground);
   --nav-line: rgb(255 255 255 / 8%);
   --nav-highlight: rgb(255 255 255 / 13%);
   --nav-sage: #a1b495;

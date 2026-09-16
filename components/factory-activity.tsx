@@ -28,7 +28,7 @@ export function FactoryActivity({ state, stream, onInspect, expanded = false }: 
   const fresh = factoryFeedFresh(feed, now) && !stream.error;
   const events = [...(feed?.events ?? [])].filter((event) => kind === "all" || event.eventType === kind)
     .sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber) || a.id.localeCompare(b.id)).slice(0, expanded ? 150 : 6);
-  return <section className="mb-3 overflow-hidden rounded-[9px] border border-signal/20 bg-[var(--surface-1)]">
+  return <section className="mb-3 overflow-hidden rounded-2xl border border-signal/20 bg-[var(--surface-1)]">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3 sm:px-5">
       <div>
         <p className={`flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.17em] ${fresh ? "text-signal" : "text-attention"}`}><Radio className="size-3.5" />{stream.paused ? "Updates paused" : fresh ? "Live factory feed" : "Factory feed · catching up"}<span className="text-foreground/20">/</span><span className="text-muted-foreground">Auto refresh · 5s</span></p>

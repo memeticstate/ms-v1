@@ -142,7 +142,7 @@ function clampUi(value: number, minimum = 0, maximum = 100) {
 function SignalBadge({ signal, compact = false }: { signal: PonsActivitySignal; compact?: boolean }) {
   const meta = signalMeta[signal];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.12em]"
+    <span className="inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium text-xs tracking-normal"
       title={meta.description}
       style={{ color: meta.color, borderColor: `color-mix(in srgb, ${meta.color} 30%, transparent)`, backgroundColor: `color-mix(in srgb, ${meta.color} 7%, transparent)` }}>
       <i className="size-1 rounded-full bg-current" />{compact ? meta.label.slice(0, 5) : meta.label}
@@ -172,7 +172,7 @@ function EmptyEngine({ error, onWake, wakeState }: {
       <div className="mx-auto grid size-20 place-items-center rounded-full border border-signal/20 bg-signal/5">
         {wakeState === "sending" ? <LoaderCircle className="size-8 animate-spin text-signal" /> : <Orbit className="size-8 text-signal" />}
       </div>
-      <p className="mt-6 font-mono text-caption uppercase tracking-[0.24em] text-signal">Canonical index warming</p>
+      <p className="mt-6 font-medium text-caption tracking-normal text-signal">Canonical index warming</p>
       <h2 className="specimen-serif mx-auto mt-3 max-w-2xl text-4xl tracking-[-0.035em] text-foreground/90 sm:text-5xl">
         The factory is connected. The first verified activity window is being reconstructed.
       </h2>
@@ -181,7 +181,7 @@ function EmptyEngine({ error, onWake, wakeState }: {
       </p>
       {error ? <p className="mx-auto mt-4 max-w-lg font-mono text-caption text-danger/75">{error}</p> : null}
       <button type="button" onClick={onWake} disabled={wakeState === "sending"}
-        className="mt-7 inline-flex items-center gap-2 rounded border border-signal/30 bg-signal/8 px-4 py-2.5 font-mono text-caption uppercase tracking-[0.16em] text-signal transition hover:bg-signal/12 disabled:opacity-50">
+        className="mt-7 inline-flex items-center gap-2 rounded border border-signal/30 bg-signal/8 px-4 py-2.5 font-medium text-caption tracking-normal text-signal transition hover:bg-signal/12 disabled:opacity-50">
         <RefreshCw className={`size-3.5 ${wakeState === "sending" ? "animate-spin" : ""}`} />
         {wakeState === "accepted" ? "Indexer dispatched" : wakeState === "failed" ? "Retry indexer" : "Run indexer now"}
       </button>
@@ -199,7 +199,7 @@ function IntegrityRail({ state, onMetric }: { state: PonsStateResponse; onMetric
     { icon: RadioTower, label: "Index lag", value: `${integer.format(state.index.liveLagBlocks)} blocks`, tone: modeTone(state.mode) },
   ];
   return (
-    <section aria-label="PONS observation integrity" className="observation-rail mb-3 grid grid-cols-2 overflow-hidden rounded-[7px] border border-foreground/10 bg-[var(--surface-1)]/82 md:grid-cols-3 xl:grid-cols-6">
+    <section aria-label="PONS observation integrity" className="observation-rail mb-3 grid grid-cols-2 overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/82 md:grid-cols-3 xl:grid-cols-6">
       {cells.map(({ icon: Icon, label, value, tone }) => (
         <button type="button" key={label} onClick={() => onMetric(label)} aria-label={`Explore ${label.toLowerCase()}`} className="observation-cell text-left transition hover:bg-foreground/5 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-signal">
           <Icon aria-hidden="true" className="size-3.5 shrink-0" style={{ color: tone }} />
@@ -223,13 +223,13 @@ function PulseCell({ icon: Icon, label, metric, tone, onClick }: {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon className="size-3.5" style={{ color: tone }} />
-          <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+          <span className="font-medium text-xs tracking-normal text-muted-foreground">{label}</span>
         </div>
         <Momentum value={metric.changePercent} current={metric.current} previous={metric.previous} />
       </div>
       <div className="mt-3 flex items-baseline gap-2">
         <strong className="font-mono text-3xl font-medium tracking-[-0.04em] text-foreground/90">{integer.format(metric.current)}</strong>
-        <span className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">vs {integer.format(metric.previous)}</span>
+        <span className="font-medium text-xs tracking-normal text-muted-foreground">vs {integer.format(metric.previous)}</span>
       </div>
       <div className="mt-3 space-y-1">
         <div className="h-1 overflow-hidden rounded-full bg-foreground/[0.055]"><div className="h-full rounded-full" style={{ width: `${metric.current / maximum * 100}%`, backgroundColor: tone }} /></div>
@@ -269,38 +269,38 @@ function ProtocolPulse({ state, onLeader, onMetric }: { state: PonsStateResponse
     window.setTimeout(() => setCardState("idle"), 1_800);
   };
   return (
-    <section className="signal-briefing overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/86">
+    <section className="signal-briefing overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/86">
       <div className="grid gap-4 border-b border-foreground/10 px-4 py-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-caption uppercase tracking-[0.22em]" style={{ color: pulseTone }}>{pulse.status} protocol pulse</span>
-            <span className="rounded border border-foreground/10 px-2 py-1 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">two adjacent {integer.format(pulse.windowBlocks)}-block intervals</span>
-            <span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.12em]" style={{
+            <span className="font-medium text-caption tracking-normal" style={{ color: pulseTone }}>{pulse.status} protocol pulse</span>
+            <span className="rounded border border-foreground/10 px-2 py-1 font-medium text-xs tracking-normal text-muted-foreground">two adjacent {integer.format(pulse.windowBlocks)}-block intervals</span>
+            <span className="rounded border px-2 py-1 font-medium text-xs tracking-normal" style={{
               color: state.integrity.pulseReconciled ? "var(--signal)" : "var(--danger)",
               borderColor: state.integrity.pulseReconciled ? "color-mix(in srgb, var(--signal) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)",
               backgroundColor: state.integrity.pulseReconciled ? "color-mix(in srgb, var(--signal) 6%, transparent)" : "color-mix(in srgb, var(--danger) 6%, transparent)",
             }}>{state.integrity.pulseReconciled ? "cohort totals reconciled" : "cohort mismatch"}</span>
-            {pulse.status === "delayed" ? <span className="rounded border border-culture/20 bg-culture/[0.045] px-2 py-1 font-mono text-xs uppercase tracking-[0.12em] text-culture">indexed edge · {integer.format(state.index.liveLagBlocks)} blocks behind</span> : null}
+            {pulse.status === "delayed" ? <span className="rounded border border-culture/20 bg-culture/[0.045] px-2 py-1 font-medium text-xs tracking-normal text-culture">indexed edge · {integer.format(state.index.liveLagBlocks)} blocks behind</span> : null}
           </div>
           <h2 className="specimen-serif mt-2 text-3xl tracking-[-0.035em] text-foreground/90 sm:text-4xl">How did verified PONS activity change at the indexed edge?</h2>
           <p className="mt-2 text-xs text-muted-foreground">Current versus prior ~{pulse.approximateMinutes}-minute interval, ending at block #{integer.format(state.index.latestIndexedBlock)}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <Button type="button" variant="outline" size="sm" onClick={() => void exportCard()} disabled={cardState === "exporting"}
-            className="border-attention/20 bg-attention/[0.035] font-mono text-xs uppercase tracking-[0.11em] text-attention hover:bg-attention/[0.08] hover:text-attention">
+            className="border-attention/20 bg-attention/[0.035] font-medium text-xs tracking-normal text-attention hover:bg-attention/[0.08] hover:text-attention">
             <ImageDown />{cardState === "exporting" ? "Rendering PNG" : cardState === "exported" ? "PNG exported" : cardState === "failed" ? "Export failed" : "Export X card"}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void copyPulse()}
-            className="border-foreground/10 bg-foreground/[0.025] font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground hover:bg-foreground/[0.06] hover:text-signal">
+            className="border-foreground/10 bg-foreground/[0.025] font-medium text-xs tracking-normal text-muted-foreground hover:bg-foreground/[0.06] hover:text-signal">
             <Copy />{briefState === "copied" ? "Pulse copied" : briefState === "failed" ? "Copy failed" : "Copy pulse"}
           </Button>
           {pulse.leader ? (
             <button type="button" onClick={() => onLeader(pulse.leader!.tokenAddress)}
               className="group rounded border border-attention/20 bg-attention/[0.045] px-3 py-2.5 text-left transition hover:border-attention/35">
-              <span className="block font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">Most active launch</span>
+              <span className="block font-medium text-xs tracking-normal text-muted-foreground">Most active launch</span>
               <span className="mt-1 flex items-center gap-2 font-mono text-caption text-attention">{pulse.leader.tokenSymbol} <i className="text-muted-foreground not-italic">{quoteAssetLabel(pulse.leader.pairSymbol)} · {pulse.leader.recentTrades} trades</i><ArrowUpRight className="size-3 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span>
             </button>
-          ) : <span className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Pulse warming</span>}
+          ) : <span className="font-medium text-xs tracking-normal text-muted-foreground">Pulse warming</span>}
         </div>
       </div>
       <div className="grid md:grid-cols-2 xl:grid-cols-4">
@@ -323,17 +323,17 @@ function StateMemoryPanel({ state }: { state: PonsStateResponse }) {
   if (state.pulse.status !== "verified") return <section className="mt-3 rounded-lg border border-foreground/15 bg-[var(--surface-2)] p-5"><h3 className="text-lg">State Memory · comparison withheld</h3><p className="mt-2 text-sm leading-6 text-foreground/65">The index is delayed. Catch-up observations are not evidence of a change happening now. Historical counts remain available in the archive; current cultural and momentum interpretations resume only with fresh evidence.</p></section>;
   const ready = state.memory.horizons.filter((horizon) => horizon.status === "ready").length;
   return (
-    <section className="state-memory mt-3 overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-depth)]/88">
+    <section className="state-memory mt-3 overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-depth)]/88">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-foreground/10 px-4 py-4 sm:px-5">
         <div className="flex gap-3">
           <span className="mt-0.5 grid size-8 place-items-center rounded border border-culture/20 bg-culture/[0.045] text-culture"><History className="size-4" /></span>
           <div>
-            <p className="font-mono text-caption uppercase tracking-[0.22em] text-culture">State Memory</p>
+            <p className="font-medium text-caption tracking-normal text-culture">State Memory</p>
             <h3 className="specimen-serif mt-1 text-2xl tracking-[-0.025em] text-foreground/86">Is the market merely loud—or outside its own recent character?</h3>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">Each stratum compares the same {integer.format(state.memory.observationWindowBlocks)}-block observation window now with its durable state at that horizon.</p>
           </div>
         </div>
-        <span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{ready}/5 horizons resolved · through #{integer.format(state.memory.currentThroughBlock)}</span>
+        <span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2.5 py-1.5 font-medium text-xs tracking-normal text-muted-foreground">{ready}/5 horizons resolved · through #{integer.format(state.memory.currentThroughBlock)}</span>
       </div>
       <div className="grid gap-px bg-foreground/10 sm:grid-cols-2 xl:grid-cols-5">
         {state.memory.horizons.map((horizon, index) => {
@@ -345,12 +345,12 @@ function StateMemoryPanel({ state }: { state: PonsStateResponse }) {
             <article key={horizon.id} className="memory-stratum relative bg-[var(--surface-2)] p-4">
               <span aria-hidden="true" className="absolute inset-y-0 left-0 w-px opacity-60" style={{ backgroundColor: tone }} />
               <div className="flex items-center justify-between gap-3">
-                <div><span className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">Stratum {String(index + 1).padStart(2, "0")}</span><h4 className="mt-1 font-mono text-sm text-foreground/78">{horizon.id}</h4></div>
+                <div><span className="font-medium text-xs tracking-normal text-muted-foreground">Stratum {String(index + 1).padStart(2, "0")}</span><h4 className="mt-1 font-mono text-sm text-foreground/78">{horizon.id}</h4></div>
                 <span className="font-mono text-xs" style={{ color: tone }}>{memoryDelta(horizon.trades.changePercent)}</span>
               </div>
               {horizon.status === "ready" ? (
                 <>
-                  <div className="mt-4 flex items-end justify-between gap-3"><div><p className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">Curve trades</p><p className="mt-1 font-mono text-xl text-foreground/84">{integer.format(horizon.trades.current)}</p></div><p className="text-right font-mono text-xs uppercase leading-4 tracking-[0.08em] text-muted-foreground">then<br /><strong className="text-caption text-muted-foreground">{integer.format(horizon.trades.baseline ?? 0)}</strong></p></div>
+                  <div className="mt-4 flex items-end justify-between gap-3"><div><p className="font-medium text-xs tracking-normal text-muted-foreground">Curve trades</p><p className="mt-1 font-mono text-xl text-foreground/84">{integer.format(horizon.trades.current)}</p></div><p className="text-right font-mono text-xs uppercase leading-4 tracking-[0.08em] text-muted-foreground">then<br /><strong className="text-caption text-muted-foreground">{integer.format(horizon.trades.baseline ?? 0)}</strong></p></div>
                   <div className="mt-3 space-y-1"><div className="h-1 overflow-hidden rounded bg-foreground/[0.055]"><span className="block h-full rounded" style={{ width: `${horizon.trades.current / maximum * 100}%`, backgroundColor: tone }} /></div><div className="h-px overflow-hidden bg-foreground/[0.035]"><span className="block h-full bg-foreground/28" style={{ width: `${(horizon.trades.baseline ?? 0) / maximum * 100}%` }} /></div></div>
                   <dl className="mt-4 grid grid-cols-2 gap-2 border-t border-foreground/[0.07] pt-3 font-mono"><div><dt className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Actors</dt><dd className="mt-1 text-caption text-foreground/60">{integer.format(horizon.activeTraders.current)} <span className="text-muted-foreground">/ {integer.format(horizon.activeTraders.baseline ?? 0)}</span></dd></div><div><dt className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Launches</dt><dd className="mt-1 text-caption text-foreground/60">{integer.format(horizon.launches.current)} <span className="text-muted-foreground">/ {integer.format(horizon.launches.baseline ?? 0)}</span></dd></div></dl>
                   <p className="mt-3 min-h-8 border-t border-foreground/[0.07] pt-3 font-mono text-xs uppercase leading-4 tracking-[0.08em] text-muted-foreground">Leader {horizon.leader.changed ? <span className="text-culture">migrated {horizon.leader.baseline} → {horizon.leader.current}</span> : <span className="text-attention">held at {horizon.leader.current ?? "—"}</span>}</p>
@@ -362,7 +362,7 @@ function StateMemoryPanel({ state }: { state: PonsStateResponse }) {
           );
         })}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 px-4 py-3 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground sm:px-5"><span>Current / historical snapshot · activity state, not price forecast</span><span>Missing horizons stay visibly warming</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 px-4 py-3 font-medium text-xs tracking-normal text-muted-foreground sm:px-5"><span>Current / historical snapshot · activity state, not price forecast</span><span>Missing horizons stay visibly warming</span></div>
     </section>
   );
 }
@@ -372,31 +372,31 @@ function ProtocolHistoryPanel({ state }: { state: PonsStateResponse }) {
   const history = state.history;
   if (!history) {
     return (
-      <section className="rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/84 p-8 text-center">
+      <section className="rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/84 p-8 text-center">
         <History className="mx-auto size-6 text-culture" />
-        <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-culture">Historical ledger warming</p>
+        <p className="mt-4 font-medium text-xs tracking-normal text-culture">Historical ledger warming</p>
         <p className="mx-auto mt-2 max-w-xl text-xs leading-5 text-muted-foreground">The current and legacy PONS factories are being registered. No historical launch or swap is displayed until its canonical log has been committed.</p>
       </section>
     );
   }
   return (
     <div className="space-y-3">
-      <section className="overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/86">
+      <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/86">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-foreground/10 p-5 sm:p-6">
-          <div><p className="font-mono text-xs uppercase tracking-[0.18em] text-culture">Indexed PONS history</p><h2 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">One archive, without flattening protocol generations.</h2><p className="mt-2 max-w-3xl text-xs leading-5 text-muted-foreground">V2 curve activity and V1 Uniswap V3 activity remain mechanically distinct. Launch discovery commits first; swap history follows behind it, so coverage is measurable instead of implied.</p></div>
+          <div><p className="font-medium text-xs tracking-normal text-culture">Indexed PONS history</p><h2 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">One archive, without flattening protocol generations.</h2><p className="mt-2 max-w-3xl text-xs leading-5 text-muted-foreground">V2 curve activity and V1 Uniswap V3 activity remain mechanically distinct. Launch discovery commits first; swap history follows behind it, so coverage is measurable instead of implied.</p></div>
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-foreground/10 bg-foreground/10 font-mono"><div className="bg-[var(--surface-2)] px-4 py-3"><p className="text-xs uppercase tracking-[0.11em] text-muted-foreground">V1 launches</p><p className="mt-1 text-lg text-foreground/76">{integer.format(history.launchCount)}</p></div><div className="bg-[var(--surface-2)] px-4 py-3"><p className="text-xs uppercase tracking-[0.11em] text-muted-foreground">V1 swaps</p><p className="mt-1 text-lg text-foreground/76">{integer.format(history.swapCount)}</p></div></div>
         </div>
         <div className="grid gap-px bg-foreground/10 lg:grid-cols-2">
           {history.generations.map((generation) => {
             const healthy = generation.consecutiveFailures === 0;
-            return <article key={generation.id} data-generation={generation.id} className="bg-[var(--surface-2)] p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs uppercase tracking-[0.14em] text-attention">{generation.id === "v1-current" ? "Current V1" : "Legacy V1"}</p><p className="mt-1 text-xs text-muted-foreground">Uniswap V3 launch + pool activity</p></div><span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.1em]" style={{ color: healthy ? "var(--signal)" : "var(--danger)", borderColor: healthy ? "color-mix(in srgb, var(--signal) 25%, transparent)" : "color-mix(in srgb, var(--danger) 25%, transparent)" }}>{healthy ? "reconciled" : `${generation.consecutiveFailures} failures`}</span></div><div className="mt-5 grid grid-cols-2 gap-4"><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Launch discovery</span><span>{generation.launchProgress.toFixed(1)}%</span></div><Progress value={generation.launchProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-attention" /></div><div><div className="flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>Swap history</span><span>{generation.swapProgress.toFixed(1)}%</span></div><Progress value={generation.swapProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-culture" /></div></div><div className="mt-5 flex items-center justify-between border-t border-foreground/[0.07] pt-3 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground"><span>{integer.format(generation.launches)} launches · {integer.format(generation.swaps)} swaps</span><a href={robinhoodExplorer.address(generation.factory)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-attention">factory <ExternalLink className="size-2.5" /></a></div></article>;
+            return <article key={generation.id} data-generation={generation.id} className="bg-[var(--surface-2)] p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-xs tracking-normal text-attention">{generation.id === "v1-current" ? "Current V1" : "Legacy V1"}</p><p className="mt-1 text-xs text-muted-foreground">Uniswap V3 launch + pool activity</p></div><span className="rounded border px-2 py-1 font-medium text-xs tracking-normal" style={{ color: healthy ? "var(--signal)" : "var(--danger)", borderColor: healthy ? "color-mix(in srgb, var(--signal) 25%, transparent)" : "color-mix(in srgb, var(--danger) 25%, transparent)" }}>{healthy ? "reconciled" : `${generation.consecutiveFailures} failures`}</span></div><div className="mt-5 grid grid-cols-2 gap-4"><div><div className="flex justify-between font-medium text-xs tracking-normal text-muted-foreground"><span>Launch discovery</span><span>{generation.launchProgress.toFixed(1)}%</span></div><Progress value={generation.launchProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-attention" /></div><div><div className="flex justify-between font-medium text-xs tracking-normal text-muted-foreground"><span>Swap history</span><span>{generation.swapProgress.toFixed(1)}%</span></div><Progress value={generation.swapProgress} className="mt-2 h-1 bg-foreground/8 [&>div]:bg-culture" /></div></div><div className="mt-5 flex items-center justify-between border-t border-foreground/[0.07] pt-3 font-medium text-xs tracking-normal text-muted-foreground"><span>{integer.format(generation.launches)} launches · {integer.format(generation.swaps)} swaps</span><a href={robinhoodExplorer.address(generation.factory)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-attention">factory <ExternalLink className="size-2.5" /></a></div></article>;
           })}
         </div>
       </section>
-      <section className="overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/86">
-        <div className="flex items-center justify-between gap-4 border-b border-foreground/10 px-4 py-3 sm:px-5"><div><p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">V1 launch ledger</p><p className="mt-1 text-caption text-muted-foreground">Most recent committed launches across both canonical factories</p></div><span className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">finality {history.finalityBlocks} blocks</span></div>
+      <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/86">
+        <div className="flex items-center justify-between gap-4 border-b border-foreground/10 px-4 py-3 sm:px-5"><div><p className="font-medium text-xs tracking-normal text-muted-foreground">V1 launch ledger</p><p className="mt-1 text-caption text-muted-foreground">Most recent committed launches across both canonical factories</p></div><span className="font-medium text-xs tracking-normal text-muted-foreground">finality {history.finalityBlocks} blocks</span></div>
         <Button variant="outline" className="m-3" onClick={() => setAscending(!ascending)}>{ascending ? "Oldest first ↑" : "Newest first ↓"}</Button>
-        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-mono text-xs uppercase tracking-[0.11em] text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><p className="font-medium text-foreground/70">{launch.symbol || short(launch.tokenAddress)}</p><p className="mt-0.5 font-mono text-xs text-muted-foreground">{launch.name || short(launch.tokenAddress)}</p></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={robinhoodExplorer.tx(launch.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
+        {history.recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] border-collapse text-left"><thead><tr className="border-b border-foreground/[0.07] font-medium text-xs tracking-normal text-muted-foreground">{["Generation", "Token", "Habitat", "Creator", "Pool activity", "Block", "Evidence"].map((label) => <th key={label} className="px-4 py-3 font-normal">{label}</th>)}</tr></thead><tbody>{[...history.recent].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((launch) => <tr key={`${launch.generation}:${launch.tokenAddress}`} className="border-b border-foreground/[0.055] text-caption text-muted-foreground last:border-0"><td className="px-4 py-3 font-mono text-xs uppercase text-culture">{launch.generation === "v1-current" ? "V1 current" : "V1 legacy"}</td><td className="px-4 py-3"><p className="font-medium text-foreground/70">{launch.symbol || short(launch.tokenAddress)}</p><p className="mt-0.5 font-mono text-xs text-muted-foreground">{launch.name || short(launch.tokenAddress)}</p></td><td className="px-4 py-3 font-mono text-xs text-attention">{quoteAssetLabel(launch.pairSymbol)}</td><td className="px-4 py-3 font-mono text-xs">{short(launch.deployerAddress)}</td><td className="px-4 py-3 font-mono text-xs">{integer.format(launch.swaps)} swaps · {integer.format(launch.uniqueTraders)} actors</td><td className="px-4 py-3 font-mono text-xs">#{integer.format(launch.blockNumber)}</td><td className="px-4 py-3"><a href={robinhoodExplorer.tx(launch.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-xs tracking-normal text-muted-foreground hover:text-attention">transaction <ExternalLink className="size-2.5" /></a></td></tr>)}</tbody></table></div> : <div className="p-10 text-center font-medium text-xs tracking-normal text-muted-foreground">Launch discovery is running · the table remains empty until the first committed range</div>}
       </section>
     </div>
   );
@@ -413,7 +413,7 @@ function CohortStrip({ cohorts, activePair, onPair }: {
     return right.attentionScore - left.attentionScore;
   });
   return (
-    <div className="mb-3 flex gap-1.5 overflow-x-auto rounded-[7px] border border-foreground/10 bg-[var(--surface-1)]/75 p-2 [scrollbar-width:none]">
+    <div className="mb-3 flex gap-1.5 overflow-x-auto rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/75 p-2 [scrollbar-width:none]">
       <button type="button" onClick={() => onPair("ALL")}
         className={`cohort-pill ${activePair === "ALL" ? "cohort-pill-active" : ""}`}>
         <span>All PONS</span><small>{cohorts.length} quote assets</small>
@@ -453,19 +453,19 @@ function PonsGravityField({ pair, cohort, launches, selected, onSelect }: {
   const visible = launches.slice(currentPage * 20, (currentPage + 1) * 20);
   const centerColor = pair === "ALL" ? "var(--signal)" : cohort?.color ?? "var(--signal)";
   return (
-    <section className="pons-field relative min-h-[570px] overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-depth)]/88 lg:min-h-[660px]">
+    <section className="pons-field relative min-h-[570px] overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-depth)]/88 lg:min-h-[660px]">
       <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 border-b border-foreground/10 bg-[var(--surface-1)]/82 px-4 py-3 backdrop-blur-md">
         <div>
           <div className="flex items-center gap-2">
             <Orbit className="size-3.5" style={{ color: centerColor }} />
-            <p className="font-mono text-caption uppercase tracking-[0.22em]" style={{ color: centerColor }}>
+            <p className="font-medium text-caption tracking-normal" style={{ color: centerColor }}>
               {pair === "ALL" ? "PONS protocol field" : `${pair} gravity field`}
             </p>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Indexed launches grouped by quote terrain. Select a bubble to inspect its evidence.</p>
         </div>
         <div className="text-right">
-          <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">Evidence map</p>
+          <p className="font-medium text-xs tracking-normal text-muted-foreground">Evidence map</p>
           <p className="mt-1 font-mono text-sm" style={{ color: centerColor }}>{visible.length} of {launches.length} records</p>
           {pageCount > 1 ? <div className="mt-1 flex justify-end gap-2 text-xs"><button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>← Previous</button><span>{currentPage + 1}/{pageCount}</span><button disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next →</button></div> : null}
         </div>
@@ -542,7 +542,7 @@ function PonsGravityField({ pair, cohort, launches, selected, onSelect }: {
           <button type="button" key={launch.tokenAddress} onClick={() => onSelect(launch)}
             className={`shrink-0 rounded border px-2.5 py-2 text-left transition ${selected?.tokenAddress === launch.tokenAddress ? "border-foreground/25 bg-foreground/10" : "border-foreground/8 bg-foreground/[0.025] hover:border-foreground/15"}`}>
             <span className="block font-mono text-xs font-semibold" style={{ color: launch.pairColor }}>{launch.symbol}</span>
-            <span className="mt-0.5 block font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground">{launch.uniqueTraders} actors · {launch.phase}</span>
+            <span className="mt-0.5 block font-medium text-xs tracking-normal text-muted-foreground">{launch.uniqueTraders} actors · {launch.phase}</span>
           </button>
         )) : <p className="px-2 py-2 text-xs text-muted-foreground">No launch records are loaded for this habitat in the selected indexed window. Try a wider research window.</p>}
       </div>
@@ -560,7 +560,7 @@ function ScoreRing({ score, color }: { score: number | null; color: string }) {
           strokeDasharray={circumference} strokeDashoffset={circumference * (1 - (score ?? 0) / 100)} />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
-        <div><span className="text-3xl font-semibold" style={{ color }}>{score ?? "—"}</span><p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{score === null ? "withheld" : "participation"}</p></div>
+        <div><span className="text-3xl font-semibold" style={{ color }}>{score ?? "—"}</span><p className="font-medium text-xs tracking-normal text-muted-foreground">{score === null ? "withheld" : "participation"}</p></div>
       </div>
     </div>
   );
@@ -595,7 +595,7 @@ export function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
       >
         <div>
           <p
-            className="font-mono text-xs uppercase tracking-[0.17em]"
+            className="font-medium text-xs tracking-normal"
             style={{ color: tone }}
           >
             Recorded state change
@@ -606,7 +606,7 @@ export function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
         </div>
 
         <div className="text-right">
-          <p className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">
+          <p className="font-medium text-xs tracking-normal text-muted-foreground">
             {transition.from} → {transition.to}
           </p>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
@@ -629,7 +629,7 @@ export function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
           </div>
         ) : null}
 
-        <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
+        <p className="font-medium text-xs tracking-normal text-muted-foreground">
           What changed at that observation
         </p>
 
@@ -647,7 +647,7 @@ export function TokenStateTransition({ launch }: { launch: PonsLaunchView }) {
         </ul>
 
         <div className="mt-4 border-t border-foreground/8 pt-3">
-          <p className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
+          <p className="font-medium text-xs tracking-normal text-muted-foreground">
             Watch next · {currentGuidance ? "current reading" : "recorded guidance"}
           </p>
           <p className="mt-2 text-xs leading-5 text-foreground/65">
@@ -668,22 +668,22 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
   const [checkNote, setCheckNote] = useState("");
   if (!launch) {
     return (
-      <aside className="grid min-h-[420px] place-items-center rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/82 p-7 text-center">
-        <div><CircleDot className="mx-auto size-7 text-muted-foreground" /><p className="mt-4 font-mono text-caption uppercase tracking-[0.18em] text-muted-foreground">Select a launch to inspect its evidence</p></div>
+      <aside className="grid min-h-[420px] place-items-center rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/82 p-7 text-center">
+        <div><CircleDot className="mx-auto size-7 text-muted-foreground" /><p className="mt-4 font-medium text-caption tracking-normal text-muted-foreground">Select a launch to inspect its evidence</p></div>
       </aside>
     );
   }
   const phaseColor = launch.phase === "graduated" ? "var(--signal)" : launch.phase === "swept" ? "var(--culture)" : "var(--signal)";
   const gradRate = launch.deployerLaunches ? Math.round(launch.deployerGraduations / launch.deployerLaunches * 100) : 0;
   return (
-    <aside data-guide="reading" className="relative overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/88 p-5 lg:p-6">
+    <aside data-guide="reading" className="relative overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/88 p-5 lg:p-6">
       <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${launch.pairColor}, transparent)` }} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <SignalBadge signal={launch.signal} />
-            <span className="rounded border px-2 py-1 font-mono text-xs uppercase tracking-[0.13em]" style={{ color: phaseColor, borderColor: `color-mix(in srgb, ${phaseColor} 34%, transparent)`, backgroundColor: `color-mix(in srgb, ${phaseColor} 7%, transparent)` }}>{launch.phase}</span>
-            <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{quoteAssetLabel(launch.pairSymbol)} habitat</span>
+            <span className="rounded border px-2 py-1 font-medium text-xs tracking-normal" style={{ color: phaseColor, borderColor: `color-mix(in srgb, ${phaseColor} 34%, transparent)`, backgroundColor: `color-mix(in srgb, ${phaseColor} 7%, transparent)` }}>{launch.phase}</span>
+            <span className="font-medium text-xs tracking-normal text-muted-foreground">{quoteAssetLabel(launch.pairSymbol)} habitat</span>
           </div>
           <h2 className="specimen-serif mt-4 break-words text-4xl tracking-[-0.035em] text-foreground/92">{launch.symbol === "—" ? "Token" : launch.symbol}</h2>
           <p className="mt-1 text-sm text-foreground/60">{launch.name}</p>
@@ -696,7 +696,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
       <TokenStateTransition launch={launch} />
 
       <Button type="button" variant="outline" size="sm" onClick={() => onToggleSave(launch)}
-        className={`mt-4 w-full justify-center font-mono text-xs uppercase tracking-[0.11em] ${saved ? "border-signal/20 bg-signal/[0.035] text-signal hover:bg-signal/[0.06]" : "border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:border-attention/25 hover:text-attention"}`}>
+        className={`mt-4 w-full justify-center font-medium text-xs tracking-normal ${saved ? "border-signal/20 bg-signal/[0.035] text-signal hover:bg-signal/[0.06]" : "border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:border-attention/25 hover:text-attention"}`}>
         {saved ? <BookmarkCheck /> : <Bookmark />}{saved ? "Saved to research watchlist" : "Save research"}
       </Button>
 
@@ -714,8 +714,8 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
       {checkNote ? <p role="status" className="mt-2 text-xs text-foreground/60">{checkNote}</p> : null}
       <div className="mt-5 rounded border border-foreground/10 bg-foreground/[0.025] px-3.5 py-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">Short-horizon read</p>
-          <span className="rounded border border-foreground/8 px-1.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">{launch.confidence} sample confidence</span>
+          <p className="font-medium text-xs tracking-normal text-muted-foreground">Short-horizon read</p>
+          <span className="rounded border border-foreground/8 px-1.5 py-0.5 font-medium text-xs tracking-normal text-muted-foreground">{launch.confidence} sample confidence</span>
         </div>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">{launch.signalNote}</p>
       </div>
@@ -730,7 +730,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
           ["Window actors", integer.format(launch.uniqueTraders)],
         ].map(([label, value]) => (
           <div key={label} className="bg-[var(--surface-3)] px-3 py-3">
-            <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+            <p className="font-medium text-xs tracking-normal text-muted-foreground">{label}</p>
             <p className="mt-1 text-lg font-semibold text-foreground/78">{value}</p>
           </div>
         ))}
@@ -738,7 +738,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
 
       <div className="mt-5 border-t border-foreground/10 pt-5">
         <div className="flex items-center justify-between gap-3">
-          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground"><GitBranch className="size-3 text-attention" />Creator lineage</p>
+          <p className="flex items-center gap-2 font-medium text-xs tracking-normal text-muted-foreground"><GitBranch className="size-3 text-attention" />Creator lineage</p>
           <span className="font-mono text-xs text-muted-foreground">{gradRate}% historical graduation</span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -753,7 +753,7 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
       </div>
 
       <div className="mt-5 border-t border-foreground/10 pt-5">
-        <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground"><Gauge className="size-3 text-signal" />Signal dimensions</p>
+        <p className="flex items-center gap-2 font-medium text-xs tracking-normal text-muted-foreground"><Gauge className="size-3 text-signal" />Signal dimensions</p>
         <div className="mt-3 space-y-3">
           {[
             ["Prior actors", launch.previousUniqueTraders ?? "unknown"],
@@ -762,14 +762,14 @@ function LaunchDossier({ launch, saved, onToggleSave }: {
             ["Recent net quote flow", launch.netQuoteFlow == null ? "unknown" : launch.netQuoteFlow < 0 ? "outflow" : "inflow"],
           ].map(([label, value]) => (
             <div key={label as string} className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground">{label}</span>
+              <span className="font-medium text-xs tracking-normal text-muted-foreground">{label}</span>
               <span className="text-right font-mono text-xs text-muted-foreground">{value}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="mt-5 space-y-2 border-t border-foreground/10 pt-4 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">
+      <div className="mt-5 space-y-2 border-t border-foreground/10 pt-4 font-medium text-xs tracking-normal text-muted-foreground">
         <a href={robinhoodExplorer.address(launch.tokenAddress)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">token {launch.tokenAddress}</span><ExternalLink className="size-3" /></a>
         <a href={robinhoodExplorer.address(launch.curveAddress)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 hover:text-muted-foreground"><span className="truncate">curve {launch.curveAddress}</span><ExternalLink className="size-3" /></a>
         <span className="flex items-center justify-between gap-3"><span>config {launch.launchConfigId} · born {relativeTime(launch.launchedAt)}</span><ShieldCheck className="size-3 text-signal" /></span>
@@ -867,14 +867,14 @@ function CohortMatrix({ cohorts, onPair }: { cohorts: PonsPairCohort[]; onPair: 
   const [order, setOrder] = useState<"recentTrades" | "recentUniqueTraders" | "launches" | "graduations" | "topDeployerShare">("recentTrades");
   const [ascending, setAscending] = useState(false);
   return (
-    <section className="mt-3 overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/82">
+    <section className="mt-3 overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/82">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3">
-        <div><p className="font-mono text-xs uppercase tracking-[0.2em] text-attention">Quote-asset ecology</p><p className="mt-1 text-xs text-muted-foreground">Compare PONS launches grouped by quote asset: recent activity, participation, lifecycle maturity, and creator concentration.</p></div>
+        <div><p className="font-medium text-xs tracking-normal text-attention">Quote-asset ecology</p><p className="mt-1 text-xs text-muted-foreground">Compare PONS launches grouped by quote asset: recent activity, participation, lifecycle maturity, and creator concentration.</p></div>
         <div className="flex gap-2"><select aria-label="Sort habitats" value={order} onChange={(e) => setOrder(e.target.value as typeof order)} className="rounded border border-foreground/20 bg-background p-2 text-xs"><option value="recentTrades">Indexed trades</option><option value="recentUniqueTraders">Actors</option><option value="launches">Launches</option><option value="graduations">Graduations</option><option value="topDeployerShare">Creator concentration</option></select><Button variant="outline" onClick={() => setAscending(!ascending)}>{ascending ? "Ascending ↑" : "Descending ↓"}</Button></div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[940px] border-collapse text-left">
-          <thead><tr className="font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
+          <thead><tr className="font-medium text-xs tracking-normal text-muted-foreground">
             <th className="px-4 py-2.5 font-normal">Terrain</th><th className="px-3 py-2.5 font-normal">Signal</th><th className="px-3 py-2.5 font-normal">State</th><th className="px-3 py-2.5 font-normal">Recent / prior</th><th className="px-3 py-2.5 font-normal">Change</th><th className="px-3 py-2.5 font-normal">Recent actors</th><th className="px-3 py-2.5 font-normal">Launches</th><th className="px-3 py-2.5 font-normal">Graduated</th><th className="px-3 py-2.5 font-normal">Top creator</th>
           </tr></thead>
           <tbody className="divide-y divide-white/[0.055]">
@@ -905,9 +905,9 @@ const eventColor: Record<PonsTapeEvent["eventType"], string> = {
 function PonsTape({ events, onInspect, state }: { events: PonsTapeEvent[]; onInspect: (address: string) => void; state: PonsStateResponse }) {
   const [ascending, setAscending] = useState(false);
   return (
-    <section className="overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/86">
+    <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/86">
       <div className="grid border-b border-foreground/10 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <div><p className="font-mono text-caption uppercase tracking-[0.22em] text-signal">Canonical lifecycle tape</p><h2 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">Birth, completion, graduation and permanent lock.</h2></div>
+        <div><p className="font-medium text-caption tracking-normal text-signal">Canonical lifecycle tape</p><h2 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">Birth, completion, graduation and permanent lock.</h2></div>
         <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground sm:mt-0 sm:text-right">Routine swaps stay in launch dossiers. The tape preserves state-changing factory events.</p>
       </div>
       <Button variant="outline" className="m-3" onClick={() => setAscending(!ascending)}>{ascending ? "Oldest first ↑" : "Newest first ↓"}</Button>
@@ -916,9 +916,9 @@ function PonsTape({ events, onInspect, state }: { events: PonsTapeEvent[]; onIns
         <div className="divide-y divide-white/[0.06]">
           {[...events].sort((a, b) => (ascending ? 1 : -1) * (a.blockNumber - b.blockNumber)).map((event) => (
             <article key={event.id} className="grid gap-3 px-4 py-3.5 transition hover:bg-foreground/[0.02] sm:grid-cols-[115px_minmax(0,1fr)_140px] sm:items-center">
-              <div className="flex items-center gap-2"><span className="size-1.5 rounded-full" style={{ backgroundColor: eventColor[event.eventType] }} /><span className="font-mono text-xs uppercase tracking-[0.14em]" style={{ color: eventColor[event.eventType] }}>{event.eventType}</span></div>
-              <button type="button" onClick={() => onInspect(event.tokenAddress)} aria-label={`Inspect ${event.tokenSymbol === "—" ? short(event.tokenAddress) : event.tokenSymbol} evidence`} className="min-w-0 text-left hover:underline"><p className="truncate text-sm text-foreground/70"><strong className="font-mono text-caption text-foreground/90">{event.tokenSymbol}</strong> <span className="text-muted-foreground">{event.detail}</span></p><p className="mt-1 truncate font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">{quoteAssetLabel(event.pairSymbol)} · token {short(event.tokenAddress)}</p></button>
-              <a href={robinhoodExplorer.tx(event.txHash)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:text-muted-foreground sm:justify-end"><span>#{integer.format(event.blockNumber)} · {relativeTime(event.observedAt)}</span><ExternalLink className="size-3" /></a>
+              <div className="flex items-center gap-2"><span className="size-1.5 rounded-full" style={{ backgroundColor: eventColor[event.eventType] }} /><span className="font-medium text-xs tracking-normal" style={{ color: eventColor[event.eventType] }}>{event.eventType}</span></div>
+              <button type="button" onClick={() => onInspect(event.tokenAddress)} aria-label={`Inspect ${event.tokenSymbol === "—" ? short(event.tokenAddress) : event.tokenSymbol} evidence`} className="min-w-0 text-left hover:underline"><p className="truncate text-sm text-foreground/70"><strong className="font-mono text-caption text-foreground/90">{event.tokenSymbol}</strong> <span className="text-muted-foreground">{event.detail}</span></p><p className="mt-1 truncate font-medium text-xs tracking-normal text-muted-foreground">{quoteAssetLabel(event.pairSymbol)} · token {short(event.tokenAddress)}</p></button>
+              <a href={robinhoodExplorer.tx(event.txHash)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 font-medium text-xs tracking-normal text-muted-foreground hover:text-muted-foreground sm:justify-end"><span>#{integer.format(event.blockNumber)} · {relativeTime(event.observedAt)}</span><ExternalLink className="size-3" /></a>
             </article>
           ))}
         </div>
@@ -966,47 +966,47 @@ function BlockSeismograph({ state }: { state: PonsStateResponse }) {
   const metadataRemainder = Math.max(0, 100 - state.coverage.metadataPercent);
 
   return (
-    <section className="block-seismograph overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-depth)]/92">
+    <section className="block-seismograph overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-depth)]/92">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-foreground/10 px-4 py-4 sm:px-5">
         <div className="flex gap-3">
           <span className="mt-0.5 grid size-8 place-items-center rounded border border-signal/20 bg-signal/[0.045] text-signal"><ScanLine className="size-4" /></span>
-          <div><p className="font-mono text-caption uppercase tracking-[0.22em] text-signal">Collection seismograph</p><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">A temporal read of cursor lag, indexed activity, metadata coverage, and the most recent collection cycle.</p></div>
+          <div><p className="font-medium text-caption tracking-normal text-signal">Collection seismograph</p><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">A temporal read of cursor lag, indexed activity, metadata coverage, and the most recent collection cycle.</p></div>
         </div>
-        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.11em]"><span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2 py-1.5" style={{ color: trendTone }}>lag {velocity.trend}</span><span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2 py-1.5" style={{ color: collectorTone }}>{state.collector.status} · {state.collector.strategy ?? state.collector.phase}</span></div>
+        <div className="flex items-center gap-2 font-medium text-xs tracking-normal"><span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2 py-1.5" style={{ color: trendTone }}>lag {velocity.trend}</span><span className="rounded border border-foreground/10 bg-foreground/[0.025] px-2 py-1.5" style={{ color: collectorTone }}>{state.collector.status} · {state.collector.strategy ?? state.collector.phase}</span></div>
       </div>
       <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,.75fr)]">
         <div className="border-b border-foreground/10 p-4 sm:p-5 xl:border-b-0 xl:border-r">
           {samples.length >= 2 ? (
             <div className="seismograph-screen relative overflow-hidden rounded border border-foreground/10 bg-[var(--surface-depth)] p-3 sm:p-4">
-              <div className="relative z-10 flex items-end justify-between gap-4"><div><p className="font-mono text-xs uppercase tracking-[0.15em] text-culture">Live-index lag contour</p><p className="mt-1 font-mono text-lg text-foreground/78">{integer.format(latest?.lagBlocks ?? state.index.liveLagBlocks)} <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">blocks</span></p></div><p className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">{integer.format(Math.max(...lag))} peak</p></div>
+              <div className="relative z-10 flex items-end justify-between gap-4"><div><p className="font-medium text-xs tracking-normal text-culture">Live-index lag contour</p><p className="mt-1 font-mono text-lg text-foreground/78">{integer.format(latest?.lagBlocks ?? state.index.liveLagBlocks)} <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">blocks</span></p></div><p className="font-medium text-xs tracking-normal text-muted-foreground">{integer.format(Math.max(...lag))} peak</p></div>
               <svg viewBox="0 0 800 84" preserveAspectRatio="none" className="relative z-10 mt-2 h-24 w-full" role="img" aria-label="PONS live index lag over recent collection samples">
                 <defs><linearGradient id="lag-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--culture)" stopOpacity=".22" /><stop offset="1" stopColor="var(--culture)" stopOpacity="0" /></linearGradient></defs>
                 <polygon points={`8,84 ${lagTrace} 792,84`} fill="url(#lag-fill)" />
                 <polyline points={lagTrace} fill="none" stroke="var(--culture)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
               </svg>
-              <div className="relative z-10 mt-2 flex items-end justify-between gap-4 border-t border-foreground/[0.07] pt-3"><div><p className="font-mono text-xs uppercase tracking-[0.15em] text-signal">Observed curve flow</p><p className="mt-1 font-mono text-lg text-foreground/78">{integer.format((latest?.buys ?? 0) + (latest?.sells ?? 0))} <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">indexed trades</span></p></div><p className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">{integer.format(latest?.activeTraders ?? 0)} actors</p></div>
+              <div className="relative z-10 mt-2 flex items-end justify-between gap-4 border-t border-foreground/[0.07] pt-3"><div><p className="font-medium text-xs tracking-normal text-signal">Observed curve flow</p><p className="mt-1 font-mono text-lg text-foreground/78">{integer.format((latest?.buys ?? 0) + (latest?.sells ?? 0))} <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">indexed trades</span></p></div><p className="font-medium text-xs tracking-normal text-muted-foreground">{integer.format(latest?.activeTraders ?? 0)} actors</p></div>
               <svg viewBox="0 0 800 84" preserveAspectRatio="none" className="relative z-10 mt-2 h-24 w-full" role="img" aria-label="PONS curve activity over recent collection samples">
                 <defs><linearGradient id="flow-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--signal)" stopOpacity=".2" /><stop offset="1" stopColor="var(--signal)" stopOpacity="0" /></linearGradient></defs>
                 <polygon points={`8,84 ${flowTrace} 792,84`} fill="url(#flow-fill)" />
                 <polyline points={flowTrace} fill="none" stroke="var(--signal)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
               </svg>
-              <div className="relative z-10 mt-1 flex justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>{earliest ? relativeTime(earliest.observedAt) : "first sample"}</span><span>{samples.length} durable samples</span><span>now</span></div>
+              <div className="relative z-10 mt-1 flex justify-between font-medium text-xs tracking-normal text-muted-foreground"><span>{earliest ? relativeTime(earliest.observedAt) : "first sample"}</span><span>{samples.length} durable samples</span><span>now</span></div>
             </div>
           ) : (
-            <div className="seismograph-screen grid min-h-[365px] place-items-center rounded border border-foreground/10 bg-[var(--surface-depth)] px-6 text-center"><div><ScanLine className="mx-auto size-7 text-signal/30" /><p className="mt-3 font-mono text-caption uppercase tracking-[0.16em] text-muted-foreground">Telemetry warming</p><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Two successful collection samples are needed to calculate cursor velocity and render the temporal trace.</p></div></div>
+            <div className="seismograph-screen grid min-h-[365px] place-items-center rounded border border-foreground/10 bg-[var(--surface-depth)] px-6 text-center"><div><ScanLine className="mx-auto size-7 text-signal/30" /><p className="mt-3 font-medium text-caption tracking-normal text-muted-foreground">Telemetry warming</p><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Two successful collection samples are needed to calculate cursor velocity and render the temporal trace.</p></div></div>
           )}
         </div>
         <div className="p-4 sm:p-5">
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-foreground/10 bg-foreground/10">
-            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Index velocity</p><p className="mt-2 font-mono text-base text-foreground/78">{velocity.indexedBlocksPerMinute === null ? "—" : compact.format(velocity.indexedBlocksPerMinute)}<span className="ml-1 text-xs uppercase text-muted-foreground">blk/min</span></p></div>
-            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Net closure</p><p className="mt-2 font-mono text-base" style={{ color: trendTone }}>{velocity.netCatchupPerMinute === null ? "—" : `${velocity.netCatchupPerMinute > 0 ? "+" : ""}${compact.format(velocity.netCatchupPerMinute)}`}<span className="ml-1 text-xs uppercase text-muted-foreground">blk/min</span></p></div>
-            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Projected live edge</p><p className="mt-2 flex items-center gap-1.5 font-mono text-base text-foreground/78"><TimerReset className="size-3.5 text-culture" />{catchupLabel(velocity.estimatedCatchupMinutes)}</p></div>
-            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Latest cycle</p><p className="mt-2 font-mono text-base text-foreground/78">{cycleDuration(state.collector.durationMs)}</p></div>
+            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-medium text-xs tracking-normal text-muted-foreground">Index velocity</p><p className="mt-2 font-mono text-base text-foreground/78">{velocity.indexedBlocksPerMinute === null ? "—" : compact.format(velocity.indexedBlocksPerMinute)}<span className="ml-1 text-xs uppercase text-muted-foreground">blk/min</span></p></div>
+            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-medium text-xs tracking-normal text-muted-foreground">Net closure</p><p className="mt-2 font-mono text-base" style={{ color: trendTone }}>{velocity.netCatchupPerMinute === null ? "—" : `${velocity.netCatchupPerMinute > 0 ? "+" : ""}${compact.format(velocity.netCatchupPerMinute)}`}<span className="ml-1 text-xs uppercase text-muted-foreground">blk/min</span></p></div>
+            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-medium text-xs tracking-normal text-muted-foreground">Projected live edge</p><p className="mt-2 flex items-center gap-1.5 font-mono text-base text-foreground/78"><TimerReset className="size-3.5 text-culture" />{catchupLabel(velocity.estimatedCatchupMinutes)}</p></div>
+            <div className="bg-[var(--surface-2)] p-3.5"><p className="font-medium text-xs tracking-normal text-muted-foreground">Latest cycle</p><p className="mt-2 font-mono text-base text-foreground/78">{cycleDuration(state.collector.durationMs)}</p></div>
           </div>
           <div className="mt-3 rounded border border-foreground/10 bg-foreground/[0.025] p-4">
-            <div className="flex items-end justify-between gap-4"><div><p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">Identity coverage</p><p className="mt-1 text-xs text-muted-foreground">Resolved token names and symbols across the committed launch set.</p></div><strong className="font-mono text-xl text-attention">{state.coverage.metadataPercent.toFixed(1)}%</strong></div>
+            <div className="flex items-end justify-between gap-4"><div><p className="font-medium text-xs tracking-normal text-muted-foreground">Identity coverage</p><p className="mt-1 text-xs text-muted-foreground">Resolved token names and symbols across the committed launch set.</p></div><strong className="font-mono text-xl text-attention">{state.coverage.metadataPercent.toFixed(1)}%</strong></div>
             <div className="mt-3 flex h-1.5 overflow-hidden rounded bg-foreground/8"><span className="h-full bg-attention" style={{ width: `${state.coverage.metadataPercent}%` }} /><span className="h-full bg-culture/35" style={{ width: `${metadataRemainder}%` }} /></div>
-            <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground"><span>resolved <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataResolved)}</strong></span><span>pending <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataPending)}</strong></span><span>failed <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataFailed)}</strong></span></div>
+            <div className="mt-3 grid grid-cols-3 gap-2 font-medium text-xs tracking-normal text-muted-foreground"><span>resolved <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataResolved)}</strong></span><span>pending <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataPending)}</strong></span><span>failed <strong className="block pt-1 text-caption text-foreground/65">{integer.format(state.coverage.metadataFailed)}</strong></span></div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2 rounded border border-foreground/10 bg-foreground/[0.018] p-3 font-mono"><span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">live blocks<strong className="mt-1 block text-caption text-muted-foreground">{integer.format(state.collector.liveBlocksProcessed)}</strong></span><span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">archive blocks<strong className="mt-1 block text-caption text-muted-foreground">{integer.format(state.collector.historicalBlocksProcessed)}</strong></span><span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">records<strong className="mt-1 block text-caption text-muted-foreground">{integer.format(state.collector.recordsProcessed)}</strong></span></div>
         </div>
@@ -1029,30 +1029,30 @@ function EvidencePanel({ state, onWake, wakeState }: {
   return (
     <div className="space-y-3">
       <BlockSeismograph state={state} />
-      <section className="grid gap-px overflow-hidden rounded-[9px] border border-foreground/10 bg-foreground/[0.07] md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-px overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/[0.07] md:grid-cols-2 xl:grid-cols-4">
         {sourceCards.map(({ icon: Icon, label, value, note, tone }) => (
           <div key={label} className="bg-[var(--surface-2)] p-5">
-            <div className="flex items-center gap-2"><Icon className="size-3.5" style={{ color: tone }} /><p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p></div>
+            <div className="flex items-center gap-2"><Icon className="size-3.5" style={{ color: tone }} /><p className="font-medium text-xs tracking-normal text-muted-foreground">{label}</p></div>
             <p className="mt-3 font-mono text-sm text-foreground/75">{value}</p><p className="mt-1 text-caption leading-4 text-muted-foreground">{note}</p>
           </div>
         ))}
       </section>
       <section className="grid gap-3 lg:grid-cols-[1.1fr_.9fr]">
-        <div className="rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/86 p-5">
-          <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-xs uppercase tracking-[0.18em] text-culture">Historical reconstruction</p><p className="mt-1 text-xs text-muted-foreground">The live edge is collected first; immutable history advances independently behind it.</p></div><strong className="font-mono text-lg text-culture">{state.index.historicalProgress.toFixed(1)}%</strong></div>
+        <div className="rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/86 p-5">
+          <div className="flex items-start justify-between gap-4"><div><p className="font-medium text-xs tracking-normal text-culture">Historical reconstruction</p><p className="mt-1 text-xs text-muted-foreground">The live edge is collected first; immutable history advances independently behind it.</p></div><strong className="font-mono text-lg text-culture">{state.index.historicalProgress.toFixed(1)}%</strong></div>
           <Progress value={state.index.historicalProgress} className="mt-5 h-1.5 bg-foreground/8 [&>div]:bg-culture" />
-          <div className="mt-3 flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>floor #{integer.format(state.index.backfillFloor)}</span><span>cursor #{integer.format(state.index.backfillNextBlock)}</span></div>
+          <div className="mt-3 flex items-center justify-between gap-3 font-medium text-xs tracking-normal text-muted-foreground"><span>floor #{integer.format(state.index.backfillFloor)}</span><span>cursor #{integer.format(state.index.backfillNextBlock)}</span></div>
           <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border border-foreground/10 bg-foreground/10">
-            <div className="bg-[var(--surface-3)] p-3"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Observation window</p><p className="mt-1 text-lg font-semibold text-foreground/75">~{state.window.approximateHours}h</p></div>
-            <div className="bg-[var(--surface-3)] p-3"><p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Score model</p><p className="mt-1 font-mono text-caption text-foreground/65">{state.methodology.scoreVersion}</p></div>
+            <div className="bg-[var(--surface-3)] p-3"><p className="font-medium text-xs tracking-normal text-muted-foreground">Observation window</p><p className="mt-1 text-lg font-semibold text-foreground/75">~{state.window.approximateHours}h</p></div>
+            <div className="bg-[var(--surface-3)] p-3"><p className="font-medium text-xs tracking-normal text-muted-foreground">Score model</p><p className="mt-1 font-mono text-caption text-foreground/65">{state.methodology.scoreVersion}</p></div>
           </div>
         </div>
-        <div className="rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/86 p-5">
-          <div className="flex items-center justify-between gap-4"><p className="font-mono text-xs uppercase tracking-[0.18em] text-signal">Method discipline</p><button type="button" onClick={onWake} disabled={wakeState === "sending"} className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.1em] text-signal/65 hover:text-signal disabled:opacity-40"><RefreshCw className={`size-3 ${wakeState === "sending" ? "animate-spin" : ""}`} />{wakeState === "accepted" ? "dispatched" : "force cycle"}</button></div>
+        <div className="rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/86 p-5">
+          <div className="flex items-center justify-between gap-4"><p className="font-medium text-xs tracking-normal text-signal">Method discipline</p><button type="button" onClick={onWake} disabled={wakeState === "sending"} className="flex items-center gap-1.5 font-medium text-xs tracking-normal text-signal/65 hover:text-signal disabled:opacity-40"><RefreshCw className={`size-3 ${wakeState === "sending" ? "animate-spin" : ""}`} />{wakeState === "accepted" ? "dispatched" : "force cycle"}</button></div>
           <div className="mt-4 space-y-3">
             {state.methodology.caveats.map((caveat) => <p key={caveat} className="flex gap-3 text-xs leading-5 text-muted-foreground"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-signal/60" />{caveat}</p>)}
           </div>
-          <a href={robinhoodExplorer.address(state.index.factory)} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-between gap-3 rounded border border-foreground/8 bg-foreground/[0.025] px-3 py-2 font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground hover:border-foreground/15 hover:text-muted-foreground"><span>Inspect canonical PONS V2 factory</span><ExternalLink className="size-3" /></a>
+          <a href={robinhoodExplorer.address(state.index.factory)} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-between gap-3 rounded border border-foreground/8 bg-foreground/[0.025] px-3 py-2 font-medium text-xs tracking-normal text-muted-foreground hover:border-foreground/15 hover:text-muted-foreground"><span>Inspect canonical PONS V2 factory</span><ExternalLink className="size-3" /></a>
         </div>
       </section>
     </div>
@@ -1097,21 +1097,21 @@ function NetworkPanel({ state, passport, localWatchCount, windowBlocks, onOpenSi
 
   return (
     <div className="space-y-3">
-      <section className="network-manifesto relative overflow-hidden rounded-[9px] border border-foreground/10 bg-[var(--surface-1)]/90">
+      <section className="network-manifesto relative overflow-hidden rounded-2xl border border-foreground/10 bg-[var(--surface-1)]/90">
         <div className="relative z-10 grid min-h-[340px] gap-8 p-5 sm:p-7 lg:grid-cols-[1.08fr_.92fr] lg:p-9">
           <div className="flex flex-col justify-between">
             <div>
-              <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.18em]"><span className="text-signal">Network thesis</span><span className="text-muted-foreground">/</span><span className="text-muted-foreground">PONS intelligence on Robinhood Chain</span></div>
+              <div className="flex flex-wrap items-center gap-2 font-medium text-xs tracking-normal"><span className="text-signal">Network thesis</span><span className="text-muted-foreground">/</span><span className="text-muted-foreground">PONS intelligence on Robinhood Chain</span></div>
               <h2 className="specimen-serif mt-5 max-w-3xl text-4xl leading-[1.02] tracking-[-0.04em] text-foreground/92 sm:text-5xl xl:text-6xl">Read the market forming <em className="font-normal text-signal">before</em> the chart explains it.</h2>
               <p className="mt-5 max-w-2xl text-sm leading-7 text-muted-foreground">Memetic State maps how token launches gather attention around onchain stock terrains. PONS is the first intelligence universe; NVDA is the flagship habitat—not the boundary of the product.</p>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={onOpenSignals} className="inline-flex items-center gap-2 rounded border border-signal/35 bg-signal/10 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-signal transition hover:bg-signal/15"><Activity className="size-3.5" />Open live signals</button>
-              <p className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Independent research · no ranking can be bought</p>
+              <button type="button" onClick={onOpenSignals} className="inline-flex items-center gap-2 rounded border border-signal/35 bg-signal/10 px-4 py-2.5 font-medium text-xs tracking-normal text-signal transition hover:bg-signal/15"><Activity className="size-3.5" />Open live signals</button>
+              <p className="font-medium text-xs tracking-normal text-muted-foreground">Independent research · no ranking can be bought</p>
             </div>
           </div>
           <div className="state-circuit self-stretch rounded border border-foreground/10 bg-[var(--surface-depth)]/76 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3"><p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">Live proof surface</p><span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em]" style={{ color: modeTone(state.mode) }}><i className="size-1.5 rounded-full bg-current" />{state.mode}</span></div>
+            <div className="flex items-center justify-between gap-3"><p className="font-medium text-xs tracking-normal text-muted-foreground">Live proof surface</p><span className="inline-flex items-center gap-1.5 font-medium text-xs tracking-normal" style={{ color: modeTone(state.mode) }}><i className="size-1.5 rounded-full bg-current" />{state.mode}</span></div>
             <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border border-foreground/10 bg-foreground/10">
               <div className="bg-[var(--surface-2)] p-4"><p className="network-kicker">launches mapped</p><strong>{integer.format(state.summary.launches)}</strong></div>
               <div className="bg-[var(--surface-2)] p-4"><p className="network-kicker">curve trades</p><strong>{integer.format(state.summary.trades)}</strong></div>
@@ -1119,7 +1119,7 @@ function NetworkPanel({ state, passport, localWatchCount, windowBlocks, onOpenSi
               <div className="bg-[var(--surface-2)] p-4"><p className="network-kicker">stock habitats</p><strong>{integer.format(state.summary.stockPairs)}</strong></div>
             </div>
             <div className="mt-5 space-y-3">
-              {[{ label: "Canonical event coverage", value: state.index.historicalProgress, tone: "var(--culture)" }, { label: "Resolved token identity", value: state.coverage.metadataPercent, tone: "var(--attention)" }].map((metric) => <div key={metric.label}><div className="mb-1.5 flex items-center justify-between font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground"><span>{metric.label}</span><span className="text-muted-foreground">{metric.value.toFixed(1)}%</span></div><div className="h-1 overflow-hidden rounded bg-foreground/8"><span className="block h-full" style={{ width: `${clampUi(metric.value)}%`, backgroundColor: metric.tone }} /></div></div>)}
+              {[{ label: "Canonical event coverage", value: state.index.historicalProgress, tone: "var(--culture)" }, { label: "Resolved token identity", value: state.coverage.metadataPercent, tone: "var(--attention)" }].map((metric) => <div key={metric.label}><div className="mb-1.5 flex items-center justify-between font-medium text-xs tracking-normal text-muted-foreground"><span>{metric.label}</span><span className="text-muted-foreground">{metric.value.toFixed(1)}%</span></div><div className="h-1 overflow-hidden rounded bg-foreground/8"><span className="block h-full" style={{ width: `${clampUi(metric.value)}%`, backgroundColor: metric.tone }} /></div></div>)}
             </div>
             <p className="mt-5 border-t border-foreground/8 pt-4 text-caption leading-5 text-muted-foreground">The commercial moat is accumulated, queryable market memory—not a one-off dashboard or a proprietary mystery score.</p>
           </div>
@@ -1130,18 +1130,18 @@ function NetworkPanel({ state, passport, localWatchCount, windowBlocks, onOpenSi
 
       <PremiumInterpretationPanel passport={passport} windowBlocks={windowBlocks} />
 
-      <section className="rounded-[9px] border border-foreground/10 bg-[var(--surface-2)]/86 p-5 sm:p-7">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-[0.18em] text-signal">State circuit</p><h3 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">Evidence becomes a decision product.</h3></div><p className="max-w-md text-xs leading-5 text-muted-foreground sm:text-right">Every commercial layer can be traced back to open, canonical observations.</p></div>
+      <section className="rounded-2xl border border-foreground/10 bg-[var(--surface-2)]/86 p-5 sm:p-7">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="font-medium text-xs tracking-normal text-signal">State circuit</p><h3 className="specimen-serif mt-2 text-3xl tracking-[-0.03em] text-foreground/88">Evidence becomes a decision product.</h3></div><p className="max-w-md text-xs leading-5 text-muted-foreground sm:text-right">Every commercial layer can be traced back to open, canonical observations.</p></div>
         <div className="mt-6 grid gap-px overflow-hidden rounded border border-foreground/10 bg-foreground/[0.08] md:grid-cols-2 xl:grid-cols-4">
-          {circuit.map(({ index, label, title, copy, tone, icon: Icon }) => <article key={label} className="circuit-station bg-[var(--surface-1)] p-5" style={{ "--station-tone": tone } as React.CSSProperties}><div className="flex items-center justify-between"><span className="font-mono text-xs tracking-[0.18em] text-muted-foreground">{index}</span><Icon className="size-4" style={{ color: tone }} /></div><p className="mt-8 font-mono text-xs uppercase tracking-[0.16em]" style={{ color: tone }}>{label}</p><h4 className="mt-2 text-base font-semibold text-foreground/76">{title}</h4><p className="mt-2 text-caption leading-5 text-muted-foreground">{copy}</p></article>)}
+          {circuit.map(({ index, label, title, copy, tone, icon: Icon }) => <article key={label} className="circuit-station bg-[var(--surface-1)] p-5" style={{ "--station-tone": tone } as React.CSSProperties}><div className="flex items-center justify-between"><span className="font-mono text-xs tracking-[0.18em] text-muted-foreground">{index}</span><Icon className="size-4" style={{ color: tone }} /></div><p className="mt-8 font-medium text-xs tracking-normal" style={{ color: tone }}>{label}</p><h4 className="mt-2 text-base font-semibold text-foreground/76">{title}</h4><p className="mt-2 text-caption leading-5 text-muted-foreground">{copy}</p></article>)}
         </div>
       </section>
 
-      <section id="founding-researchers" className="relative overflow-hidden rounded-[9px] border border-signal/16 bg-[var(--surface-1)]/92 p-5 sm:p-7">
+      <section id="founding-researchers" className="relative overflow-hidden rounded-2xl border border-signal/16 bg-[var(--surface-1)]/92 p-5 sm:p-7">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-signal/70 to-transparent" />
         <div className="grid gap-8 lg:grid-cols-[.82fr_1.18fr] lg:items-start">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-signal">Founding research cohort · 10 seats</p>
+            <p className="font-medium text-xs tracking-normal text-signal">Founding research cohort · 10 seats</p>
             <h3 className="specimen-serif mt-3 text-4xl leading-[1.04] tracking-[-0.035em] text-foreground/90">Help turn PONS monitoring into a workflow you rely on.</h3>
             <p className="mt-4 max-w-xl text-sm leading-7 text-muted-foreground">We are recruiting four active researchers, three launch teams, and three ecosystem or data builders. Founding partners get direct input into alerts, history, exports and coverage priorities. Canonical evidence stays public and no ranking can be bought.</p>
             <div className="mt-5 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
@@ -1150,17 +1150,17 @@ function NetworkPanel({ state, passport, localWatchCount, windowBlocks, onOpenSi
           </div>
           {partnerState === "accepted" ? (
             <div className="grid min-h-[320px] place-items-center rounded border border-signal/18 bg-signal/[0.035] p-8 text-center">
-              <div><CheckCircle2 className="mx-auto size-8 text-signal" /><p className="mt-5 font-mono text-xs uppercase tracking-[0.18em] text-signal">Application received</p><h4 className="specimen-serif mt-3 text-3xl text-foreground/86">You’re on the founding research list.</h4><p className="mx-auto mt-3 max-w-md text-xs leading-6 text-muted-foreground">We’ll use the contact you provided to arrange a short workflow session. Until then, save a few launches and note what Memetic State should watch while you are away.</p><button type="button" onClick={onOpenWatchlist} className="mt-6 inline-flex items-center gap-2 rounded border border-attention/25 bg-attention/[0.05] px-4 py-2.5 font-mono text-xs uppercase tracking-[0.12em] text-attention"><Bookmark className="size-3.5" />Open watchlist</button></div>
+              <div><CheckCircle2 className="mx-auto size-8 text-signal" /><p className="mt-5 font-medium text-xs tracking-normal text-signal">Application received</p><h4 className="specimen-serif mt-3 text-3xl text-foreground/86">You’re on the founding research list.</h4><p className="mx-auto mt-3 max-w-md text-xs leading-6 text-muted-foreground">We’ll use the contact you provided to arrange a short workflow session. Until then, save a few launches and note what Memetic State should watch while you are away.</p><button type="button" onClick={onOpenWatchlist} className="mt-6 inline-flex items-center gap-2 rounded border border-attention/25 bg-attention/[0.05] px-4 py-2.5 font-medium text-xs tracking-normal text-attention"><Bookmark className="size-3.5" />Open watchlist</button></div>
             </div>
           ) : (
             <form onSubmit={submitPartner} className="rounded border border-foreground/10 bg-[var(--surface-depth)]/76 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3"><p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">Apply to the cohort</p><span className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">No wallet required</span></div>
-              <label className="mt-5 block"><span className="mb-2 block font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">Your role</span><Select value={partnerPersona} onValueChange={setPartnerPersona}><SelectTrigger className="w-full border-foreground/10 bg-foreground/[0.025] text-foreground/60"><SelectValue /></SelectTrigger><SelectContent className="border-foreground/10 bg-[var(--surface-popover)] text-foreground/75"><SelectItem value="researcher">Researcher or trader</SelectItem><SelectItem value="launch-team">PONS launch team</SelectItem><SelectItem value="ecosystem-builder">Ecosystem or data builder</SelectItem></SelectContent></Select></label>
-              <label className="mt-4 block"><span className="mb-2 block font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">X handle or email</span><Input required minLength={3} maxLength={120} value={partnerContact} onChange={(event) => setPartnerContact(event.target.value)} placeholder="@handle or name@example.com" className="border-foreground/10 bg-foreground/[0.025] text-foreground/70 placeholder:text-muted-foreground" /></label>
-              <label className="mt-4 block"><span className="mb-2 block font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">What do you monitor manually today?</span><textarea required minLength={12} maxLength={800} rows={5} value={partnerWorkflow} onChange={(event) => setPartnerWorkflow(event.target.value)} placeholder="The launch, habitat or activity change you keep checking—and what would make an alert useful." className="w-full resize-y rounded-md border border-foreground/10 bg-foreground/[0.025] px-3 py-2.5 text-xs leading-5 text-foreground/70 outline-none transition placeholder:text-muted-foreground focus:border-signal/30" /></label>
+              <div className="flex items-center justify-between gap-3"><p className="font-medium text-xs tracking-normal text-muted-foreground">Apply to the cohort</p><span className="font-medium text-xs tracking-normal text-muted-foreground">No wallet required</span></div>
+              <label className="mt-5 block"><span className="mb-2 block font-medium text-xs tracking-normal text-muted-foreground">Your role</span><Select value={partnerPersona} onValueChange={setPartnerPersona}><SelectTrigger className="w-full border-foreground/10 bg-foreground/[0.025] text-foreground/60"><SelectValue /></SelectTrigger><SelectContent className="border-foreground/10 bg-[var(--surface-popover)] text-foreground/75"><SelectItem value="researcher">Researcher or trader</SelectItem><SelectItem value="launch-team">PONS launch team</SelectItem><SelectItem value="ecosystem-builder">Ecosystem or data builder</SelectItem></SelectContent></Select></label>
+              <label className="mt-4 block"><span className="mb-2 block font-medium text-xs tracking-normal text-muted-foreground">X handle or email</span><Input required minLength={3} maxLength={120} value={partnerContact} onChange={(event) => setPartnerContact(event.target.value)} placeholder="@handle or name@example.com" className="border-foreground/10 bg-foreground/[0.025] text-foreground/70 placeholder:text-muted-foreground" /></label>
+              <label className="mt-4 block"><span className="mb-2 block font-medium text-xs tracking-normal text-muted-foreground">What do you monitor manually today?</span><textarea required minLength={12} maxLength={800} rows={5} value={partnerWorkflow} onChange={(event) => setPartnerWorkflow(event.target.value)} placeholder="The launch, habitat or activity change you keep checking—and what would make an alert useful." className="w-full resize-y rounded-md border border-foreground/10 bg-foreground/[0.025] px-3 py-2.5 text-xs leading-5 text-foreground/70 outline-none transition placeholder:text-muted-foreground focus:border-signal/30" /></label>
               <input tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" className="hidden" />
-              <Button type="submit" disabled={partnerState === "sending"} className="mt-4 w-full border border-signal/30 bg-signal/10 font-mono text-xs uppercase tracking-[0.14em] text-signal hover:bg-signal/15"><Users />{partnerState === "sending" ? "Submitting" : partnerState === "failed" ? "Retry application" : "Join founding research cohort"}</Button>
-              <p className="mt-3 text-center font-mono text-xs uppercase tracking-[0.09em] text-muted-foreground">Used only to contact you about Memetic State research access</p>
+              <Button type="submit" disabled={partnerState === "sending"} className="mt-4 w-full border border-signal/30 bg-signal/10 font-medium text-xs tracking-normal text-signal hover:bg-signal/15"><Users />{partnerState === "sending" ? "Submitting" : partnerState === "failed" ? "Retry application" : "Join founding research cohort"}</Button>
+              <p className="mt-3 text-center font-medium text-xs tracking-normal text-muted-foreground">Used only to contact you about Memetic State research access</p>
             </form>
           )}
         </div>
@@ -1523,14 +1523,15 @@ export function PonsObservatory({ experience = "observe" }: { experience?: Obser
   const unreadWatchAlerts = watchlist.reduce((total, entry) => total + entry.alerts.filter((item) => !item.read).length, 0);
 
   return (
-    <main className="min-h-screen px-3 pb-24 sm:px-5 md:pb-6 lg:px-7">
-      <div className={`mx-auto ${experience === "observe" ? "max-w-[1720px]" : "max-w-[1180px]"}`}>
+    <div className="workspace-shell">
+      <div>
         <AppHeader active={experience} passport={passport} onAccount={() => {
           if (experience !== "observe") { window.location.assign("/app/observe?view=network#passport"); return; }
           setActiveView("network"); window.setTimeout(() => document.getElementById("passport")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
         }} />
-        <div className="mb-5 mt-5 flex flex-wrap items-end justify-between gap-3">
-          <div><p className="font-mono text-xs uppercase tracking-[0.18em] text-attention">{experience === "observe" ? "Full evidence workspace" : experience === "research" ? "Holder workspace" : "Your research memory"}</p><h1 className="specimen-serif mt-2 text-3xl sm:text-4xl">{experience === "observe" ? "Observatory" : experience === "research" ? "Research" : "Saved"}</h1>{experience === "saved" ? <p className="mt-2 text-sm text-muted-foreground">Watch your tokens, revisit your questions, and compare saved evidence.</p> : null}</div>
+        <main id="workspace-content" className="workspace-main" data-experience={experience}>
+        <div className="workspace-heading">
+          <div><p className="font-medium text-xs tracking-normal text-attention">{experience === "observe" ? "Full evidence workspace" : experience === "research" ? "Holder workspace" : "Your research memory"}</p><h1 className="specimen-serif mt-2 text-3xl sm:text-4xl">{experience === "observe" ? "Observatory" : experience === "research" ? "Research" : "Saved"}</h1><p className="workspace-description">{experience === "observe" ? "Follow the signals. Open the evidence. Form your own reading." : experience === "research" ? "Turn a question into a dated, evidence-backed reading." : "Watch your tokens, revisit your questions, and compare saved evidence."}</p></div>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="icon-sm" onClick={() => void copyView()} aria-label="Copy current page link" title="Copy current view"
               className="border-foreground/10 bg-foreground/[0.025] text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/75"><Copy className="size-3.5" /></Button>
@@ -1539,33 +1540,33 @@ export function PonsObservatory({ experience = "observe" }: { experience?: Obser
           </div>
         </div>
 
-        {copyState !== "idle" ? <div role="status" className="fixed right-4 top-20 z-50 rounded border border-foreground/10 bg-[var(--surface-popover)]/95 px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-signal shadow-xl">{copyState === "copied" ? "View link copied" : "Copy unavailable"}</div> : null}
+        {copyState !== "idle" ? <div role="status" className="fixed right-4 top-20 z-50 rounded border border-foreground/10 bg-[var(--surface-popover)]/95 px-3 py-2 font-medium text-xs tracking-normal text-signal shadow-xl">{copyState === "copied" ? "View link copied" : "Copy unavailable"}</div> : null}
         {experience === "observe" ? <>
-        <div className="relative z-30 mb-4 flex items-center gap-3" role="search" aria-label="Search all Robinhood Chain tokens"><TokenSearch onSelect={inspectSearchResult} /><span className="hidden text-sm text-muted-foreground sm:block">Robinhood Chain</span></div>
+        <div className="workspace-search" role="search" aria-label="Search all Robinhood Chain tokens"><TokenSearch onSelect={inspectSearchResult} /><span className="hidden text-sm text-muted-foreground sm:block">Robinhood Chain</span></div>
 
         {state ? <div data-guide="freshness"><IntegrityRail state={state} onMetric={exploreMetric} /></div> : null}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-attention/25 px-3 py-2">
+        <div className="workspace-freshness">
           <p role="status" className="min-w-60 flex-1 text-sm text-attention">{!state ? "Loading chain evidence…" : state.mode !== "live" || state.index.liveLagBlocks > 10_000 ? `Historical trade reading · ${integer.format(state.index.liveLagBlocks)} blocks behind. Readings describe the indexed window.` : `Current evidence · ${integer.format(state.index.liveLagBlocks)} blocks behind the observed head.`}</p>
           <FieldGuide onStart={() => setActiveView("signals")} onExplore={() => setActiveView("atlas")} onWatch={() => setActiveView("watchlist")} onEvidence={() => setActiveView("evidence")} />
         </div>
         {error && state ? <div role="status" className="mb-3 flex items-center justify-between gap-3 rounded border border-danger/20 bg-danger/[0.045] px-3 py-2 font-mono text-xs text-danger/75"><span>{error} · showing the last verified state</span><button type="button" onClick={() => void refresh()} className="uppercase tracking-[0.1em]">Retry</button></div> : null}
         {!state || state.mode === "empty" ? <><FactoryActivity stream={factoryStream} onInspect={event => { setFactoryEvent(event); setSelectedAddress(event.tokenAddress); setDossierOpen(true); }} /><EmptyEngine error={error} onWake={() => void wake()} wakeState={wakeState} /></> : (
           <Tabs value={activeView} onValueChange={(value) => setActiveView(value as ObservatoryView)} className="gap-3">
-            <div data-guide="navigation" className="observatory-toolbar flex flex-wrap items-center justify-between gap-3 rounded-[7px] border border-foreground/10 bg-[var(--surface-1)]/78 px-3">
-              <TabsList variant="line" className="h-11 max-w-full gap-4 overflow-x-auto p-0 [scrollbar-width:none] sm:gap-5">
-                <TabsTrigger value="signals" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><BarChart3 />Signals</TabsTrigger>
-                <TabsTrigger value="atlas" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><Orbit />Atlas</TabsTrigger>
-                <TabsTrigger value="watchlist" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><BellRing />Watchlist{watchlist.length ? <span className={`ml-0.5 rounded px-1.5 py-0.5 text-xs ${unreadWatchAlerts ? "bg-signal/10 text-signal" : "bg-foreground/[0.055] text-muted-foreground"}`}>{unreadWatchAlerts || watchlist.length}</span> : null}</TabsTrigger>
-                <TabsTrigger value="tape" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><Activity />Lifecycle</TabsTrigger>
-                <TabsTrigger value="history" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><History />History</TabsTrigger>
-                <TabsTrigger value="evidence" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><Database />Evidence</TabsTrigger>
-                <TabsTrigger value="premium" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><ShieldCheck />Premium</TabsTrigger>
-                <TabsTrigger value="network" className="px-0 font-mono text-sm uppercase tracking-[0.13em] sm:text-sm"><Network />Network</TabsTrigger>
+            <div data-guide="navigation" className="observatory-toolbar">
+              <TabsList variant="line" className="workspace-tabs">
+                <TabsTrigger value="signals" className="workspace-tab"><BarChart3 />Signals</TabsTrigger>
+                <TabsTrigger value="atlas" className="workspace-tab"><Orbit />Atlas</TabsTrigger>
+                <TabsTrigger value="watchlist" className="workspace-tab"><BellRing />Watchlist{watchlist.length ? <span className={`ml-0.5 rounded px-1.5 py-0.5 text-xs ${unreadWatchAlerts ? "bg-signal/10 text-signal" : "bg-foreground/[0.055] text-muted-foreground"}`}>{unreadWatchAlerts || watchlist.length}</span> : null}</TabsTrigger>
+                <TabsTrigger value="tape" className="workspace-tab"><Activity />Lifecycle</TabsTrigger>
+                <TabsTrigger value="history" className="workspace-tab"><History />History</TabsTrigger>
+                <TabsTrigger value="evidence" className="workspace-tab"><Database />Evidence</TabsTrigger>
+                <TabsTrigger value="premium" className="workspace-tab"><ShieldCheck />Premium</TabsTrigger>
+                <TabsTrigger value="network" className="workspace-tab"><Network />Network</TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2 pb-2 sm:pb-0">
-                <span className="hidden font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground sm:inline">Research window</span>
+              <div className="workspace-window">
+                <span className="text-xs text-muted-foreground">Research window</span>
                 <Select value={String(windowBlocks)} onValueChange={(value) => setWindowBlocks(Number(value))}>
-                  <SelectTrigger aria-label="Select research window" size="sm" className="w-[228px] max-w-full border-foreground/10 bg-foreground/[0.025] font-mono text-sm uppercase tracking-[0.08em] text-muted-foreground"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Select research window" size="sm" className="w-[228px] max-w-full text-sm text-muted-foreground"><SelectValue /></SelectTrigger>
                   <SelectContent className="border-foreground/10 bg-[var(--surface-popover)] text-foreground/70">{PONS_STATE_WINDOWS.map((blocks) => <SelectItem key={blocks} value={String(blocks)}>{integer.format(blocks)} blocks · {windowLabel(blocks)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -1573,11 +1574,9 @@ export function PonsObservatory({ experience = "observe" }: { experience?: Obser
             <TabsContent value="signals">
               <FactoryActivity state={state} stream={factoryStream} onInspect={(event) => { setFactoryEvent(event); setSelectedAddress(event.tokenAddress); setDossierOpen(true); }} />
               <ProtocolPulse state={state} onLeader={inspectLeader} onMetric={explorePulse} />
-              <ProtocolCoveragePanel state={state} onBrowse={browseGeneration} />
-              <StateMemoryPanel state={state} />
               <div className="mt-3"><CohortStrip cohorts={state.cohorts} activePair={activePair} onPair={choosePair} /></div>
               <div data-guide="reading"><SignalDesk launches={filteredLaunches} selected={selected} onSelect={inspectLaunch} state={state} isSaved={isSaved} onToggleSave={toggleWatch} phase={phaseFilter} setPhase={setPhaseFilter} signal={signalFilter} setSignal={setSignalFilter} sort={signalSort} setSort={setSignalSort} /></div>
-              <CohortMatrix cohorts={state.cohorts} onPair={explorePair} />
+              <details className="workspace-context"><summary><span>Coverage &amp; market context</span><span>Protocols, state memory, and quote-asset relationships</span></summary><div className="space-y-4"><ProtocolCoveragePanel state={state} onBrowse={browseGeneration} /><StateMemoryPanel state={state} /><CohortMatrix cohorts={state.cohorts} onPair={explorePair} /></div></details>
             </TabsContent>
             <TabsContent value="atlas">
               <CohortStrip cohorts={state.cohorts} activePair={activePair} onPair={choosePair} />
@@ -1613,12 +1612,13 @@ export function PonsObservatory({ experience = "observe" }: { experience?: Obser
           {selected ? <LaunchDossier launch={selected} saved={isSaved(selected.tokenAddress)} onToggleSave={toggleWatch} /> : null}
           {selectedAddress ? <a href={appTokenHref("research", selectedAddress)} className="inline-flex items-center justify-center gap-2 rounded border border-foreground/15 px-4 py-3 text-sm hover:bg-foreground/5"><ShieldCheck className="size-4" />Ask about this token · Holder access</a> : null}
         </DialogContent></Dialog>
-        <footer className="mt-4 flex flex-col justify-between gap-2 border-t border-foreground/10 px-1 pt-4 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground sm:flex-row">
+        <footer className="workspace-footer">
           <a href="/docs" className="text-attention underline underline-offset-4">Documentation</a>
           <span>{state?.index.source ?? "PONS V2 canonical factory"}{state?.index.lastSuccessAt ? ` · collected ${relativeTime(state.index.lastSuccessAt)}` : ""}</span>
           <span>Attention describes observed activity—not asset quality, backing, or financial merit</span>
         </footer>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }

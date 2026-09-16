@@ -90,12 +90,12 @@ test("Pulse visual export is X-ready and evidence labeled", async () => {
   assert.match(source, /OBSERVED ACTIVITY—NOT ASSET QUALITY/);
 });
 
-test("Field Archive branding ships a real day and night atlas", async () => {
-  const css = await readFile(path.join(root, "app/globals.css"), "utf8");
+test("Shared product identity ships dark and light themes", async () => {
+  const css = await readFile(path.join(root, "app/design-tokens.css"), "utf8");
   const layout = await readFile(path.join(root, "app/layout.tsx"), "utf8");
   const header = await readFile(path.join(root, "components/app-header.tsx"), "utf8");
-  assert.match(css, /--lichen-green: #a4b579/);
-  assert.match(css, /\.light \{[\s\S]*--background: #e8e1d2/);
+  assert.match(css, /--signal: #bee68a/);
+  assert.match(css, /\.light \{[\s\S]*--background: #f6f7f5/);
   assert.doesNotMatch(css, /#00ffcc|#8a2be2/i);
   assert.match(layout, /<ThemeProvider>/);
   assert.match(header, /aria-label="Toggle light and dark theme"/);

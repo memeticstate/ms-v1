@@ -1,4 +1,37 @@
-# Memetic State: Simple v63 staging review
+# Memetic State v64 — unified product design
+
+Base: `infra/cloudflare-staging-v62` at `da281c6f09baf9021f06a538bf9d2ff938bf9271`.
+Review branch: `work/unified-design-v64`. Staging only.
+
+The user confirmed v63 deployment version `6089ce99-6276-4097-9b45-bf1fd3c27a29`.
+This v64 change has not been deployed from this session.
+
+## Changes
+
+- Central dark/light design tokens for Simple, Token Brief, Observatory, Research, Saved, landing, search and portaled UI.
+- Consistent workspace width, sans-serif headings, neutral charcoal panels, readable controls, rounded navigation and mobile spacing.
+- Observatory puts signals first; protocol coverage, state memory and the cohort matrix remain in an expandable context section and the dedicated evidence views.
+- Research has clearer feature cards, forms and tabs. Existing wallet verification and 0.1% access checks remain intact.
+- Saved gains larger token identities and collapsible watch rules. Trade-change values distinguish missing data from older saved observations.
+- Landing shares the app header, theme and visual identity. Documentation follows the saved appearance preference, with OS preference as fallback. Redactions are preserved.
+
+## Verification
+
+- Production build: passed.
+- TypeScript: passed.
+- Regression suite: 180 passed, 0 failed. Updated the existing branding assertion to require the new shared palette.
+- Fourteen actual component screens rendered into a standalone preview with illustrative data. Preview scripts validated; desktop/390px and dark/light controls included.
+- Browser visual review: pending. Cloud browser policy rejected local preview files; no bypass attempted.
+- Authenticated holder access, live mobile review, API parity and soak remain open release gates.
+- Cloudflare deployment access is not exposed in this session. The compiled package is for the owner's authenticated Wrangler session.
+
+No RPC, indexer, D1 schema, classification, holder threshold, production Worker or DNS changes.
+
+---
+
+## Previous release record
+
+### Simple v63 staging review
 
 Base: `infra/cloudflare-staging-v62` at `e4d30bc6eefe65b370cdb4df5ac32a26ac5d84fc`.
 Review branch: `work/simple-experience-v62`. Target: `infra/cloudflare-staging-v62`.
